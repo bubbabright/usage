@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<!--
+  Firecrawl usage-history report — self-contained artifact.
+
+  This file is a TEMPLATE. The extension (extension.js / prefs.js) reads
+  it, replaces the two placeholder tokens below with live data, writes the
+  result to ~/.cache/firecrawl-usage/usage-report.html, and opens it in the
+  browser.
+
+  Placeholders (replaced verbatim, keep the exact strings):
+    /*__USAGE_DATA__*/[]     -> JSON array of history.jsonl entries:
+                                 {t, remaining, plan, pct, period_start, period_end}
+    /*__GENERATED_AT__*/0    -> Date.now() at generation time
+
+  Design goals:
+    - No external dependencies. No CDN, no fetch, no CORS. Opens offline
+      from file:// with data baked in.
+    - Canvas 2D, devicePixelRatio-aware so it stays crisp on HiDPI.
+    - Unlike the Claude/Grok reports (0-100% quota bars against a hard
+      reset), Firecrawl credits roll over indefinitely — the balance can
+      run well above one cycle's plan credits. So this chart plots the raw
+      remaining-credit count on an auto-scaled y-axis, with a dashed
+      reference line at the current plan-credits level, instead of a
+      percentage axis.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firecrawl Usage History</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #6b6b6b;
+    --grid: rgba(0,0,0,0.10); --card: #f4f4f5; --border: rgba(0,0,0,0.12);
+    --balance: #D55E00; --plan-line: rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --fg: #ececec; --muted: #9a9a9a;
+      --grid: rgba(255,255,255,0.10); --card: #262626; --border: rgba(255,255,255,0.12);
+      --plan-line: rgba(255,255,255,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; gap: 6px; margin: 16px 0; flex-wrap: wrap; }
+  .controls button {
+    font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--fg);
+    cursor: pointer; transition: background 120ms, border-color 120ms;
+  }
+  .controls button:hover { border-color: var(--muted); }
+  .controls button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .legend { display: flex; gap: 18px; margin: 10px 0 14px; font-size: 13px; }
+  .legend .item { display: flex; align-items: center; gap: 7px; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .legend .swatch.line { background: none; border-top: 2px dashed var(--plan-line); height: 0; width: 16px; align-self: center; }
+  .chart-wrap { position: relative; width: 100%; }
+  canvas { width: 100%; height: 340px; display: block; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 5; opacity: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.5; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18); transition: opacity 80ms;
+  }
+  .tooltip .t-time { color: var(--muted); margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
+  .tooltip .t-dot { width: 9px; height: 9px; border-radius: 2px; background: var(--balance); }
+  .stats-panel {
+    margin-top: 20px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+  }
+  .stats-panel h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+  .stats-panel .hint { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .stats-table th, .stats-table td {
+    padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-table th:first-child, .stats-table td:first-child { text-align: left; font-weight: 600; }
+  .stats-table thead th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .stats-table tbody tr:last-child td { border-bottom: none; }
+  .stats-table .dash { color: var(--muted); font-weight: 400; }
+  footer { margin-top: 22px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Firecrawl Usage History</h1>
+    <span class="sub" id="meta"></span>
+  </header>
+
+  <div class="controls" id="ranges">
+    <button data-ms="86400000">24 Hours</button>
+    <button data-ms="604800000" class="active">7 Days</button>
+    <button data-ms="2592000000">30 Days</button>
+    <button data-ms="0">All Time</button>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="swatch" style="background:var(--balance)"></span>Remaining credits</div>
+    <div class="item"><span class="swatch line"></span>Current plan credits / cycle</div>
+  </div>
+
+  <div class="chart-wrap" id="chart-view">
+    <canvas id="chart"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <div class="stats-panel" id="stats-panel">
+    <h3>Burn rate</h3>
+    <p class="hint">Credits consumed per period, from consecutive polls. Negative = balance growing. Cells show - until enough samples exist.</p>
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Now</th>
+          <th>Avg</th>
+          <th>Peak (date)</th>
+        </tr>
+      </thead>
+      <tbody id="stats-rows"></tbody>
+    </table>
+  </div>
+  <footer id="footer"></footer>
+
+<script>
+"use strict";
+
+// ---- injected by the generator (see comment block at top of file) --------
+const USAGE_DATA = /*__USAGE_DATA__*/[];
+const GENERATED_AT = /*__GENERATED_AT__*/0;
+// --------------------------------------------------------------------------
+
+const COLOR_BALANCE = "#D55E00";
+const PAD = { top: 16, right: 16, bottom: 28, left: 56 };
+const HOUR_MS = 3600000;
+const DAY_MS = 86400000;
+const WEEK_MS = 7 * DAY_MS;
+const DASH = "-";
+
+const state = {
+  rangeMs: 604800000, // default: 7 days
+  points: [],          // filtered {t, remaining}
+  planCredits: null,
+};
+
+const canvas = document.getElementById("chart");
+const ctx = canvas.getContext("2d");
+const tooltip = document.getElementById("tooltip");
+
+const allData = (USAGE_DATA || [])
+  .filter(d => d && typeof d.t === "number" && typeof d.remaining === "number")
+  .sort((a, b) => a.t - b.t);
+
+const now = GENERATED_AT || Date.now();
+const latestPlan = allData.length ? allData[allData.length - 1].plan : null;
+
+function fmtCredits(n) {
+  if (!Number.isFinite(n)) return DASH;
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return `${Math.round(n)}`;
+}
+
+function fmtTime(ms) {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtShortDate(ms) {
+  return fmtTime(ms);
+}
+
+function fmtRate(v, suffix) {
+  if (!Number.isFinite(v)) return DASH;
+  return `${v >= 0 ? "" : "+"}${fmtCredits(-v)}${suffix}`;
+}
+
+function consecutiveIntervals(points) {
+  const out = [];
+  for (let i = 1; i < points.length; i++) {
+    const dt = points[i].t - points[i - 1].t;
+    if (dt <= 0) continue;
+    out.push({
+      t: points[i].t,
+      dt,
+      // Positive dp = credits consumed (remaining went down).
+      dp: points[i - 1].remaining - points[i].remaining,
+    });
+  }
+  return out;
+}
+
+function periodRowStats(points, periodMs, minSpanMs, suffix) {
+  const ivs = consecutiveIntervals(points).filter(iv => iv.dt >= minSpanMs);
+  const rate = iv => iv.dp / (iv.dt / periodMs);
+
+  let nowCell = DASH;
+  if (ivs.length >= 1)
+    nowCell = fmtRate(rate(ivs[ivs.length - 1]), suffix);
+
+  let avg = DASH;
+  if (ivs.length >= 2) {
+    const rates = ivs.map(rate);
+    avg = fmtRate(rates.reduce((a, b) => a + b, 0) / rates.length, suffix);
+  }
+
+  let peak = DASH;
+  if (ivs.length >= 2) {
+    let best = ivs[0], bestVal = rate(best);
+    for (const iv of ivs) {
+      const r = rate(iv);
+      if (r > bestVal) { bestVal = r; best = iv; }
+    }
+    peak = `${fmtRate(bestVal, suffix)} · ${fmtShortDate(best.t)}`;
+  }
+
+  return { now: nowCell, avg, peak };
+}
+
+function recompute() {
+  const since = state.rangeMs ? now - state.rangeMs : 0;
+  const filtered = allData.filter(d => d.t >= since);
+  state.points = filtered.map(d => ({ t: d.t, remaining: d.remaining }));
+  state.planCredits = filtered.length ? filtered[filtered.length - 1].plan : latestPlan;
+  renderStatsTable();
+  draw();
+}
+
+function renderStatsTable() {
+  const el = document.getElementById("stats-rows");
+  el.innerHTML = "";
+
+  const rows = [
+    { label: "Hourly", ...periodRowStats(state.points, HOUR_MS, 30 * 60 * 1000, "/h") },
+    { label: "Daily", ...periodRowStats(state.points, DAY_MS, 6 * HOUR_MS, "/day") },
+    { label: "Weekly", ...periodRowStats(state.points, WEEK_MS, DAY_MS, "/wk") },
+  ];
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const cell = (val) => {
+      const dash = val === DASH;
+      return `<td${dash ? ' class="dash"' : ""}>${val}</td>`;
+    };
+    tr.innerHTML =
+      `<td>${row.label}</td>` +
+      cell(row.now) + cell(row.avg) + cell(row.peak);
+    el.appendChild(tr);
+  }
+}
+
+function setupCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: rect.width, h: rect.height };
+}
+
+function plotGeom(w, h) {
+  return {
+    x0: PAD.left, y0: PAD.top,
+    pw: w - PAD.left - PAD.right,
+    ph: h - PAD.top - PAD.bottom,
+  };
+}
+
+function xRange() {
+  const since = state.rangeMs ? now - state.rangeMs : (state.points.length ? state.points[0].t : now);
+  return { since, until: now };
+}
+
+function yDomain() {
+  const vals = state.points.map(p => p.remaining);
+  if (state.planCredits != null) vals.push(state.planCredits);
+  if (!vals.length) return { min: 0, max: 100 };
+  let min = Math.min(0, ...vals);
+  let max = Math.max(...vals);
+  if (min === max) { min -= 1; max += 1; }
+  const pad = (max - min) * 0.08;
+  return { min: min - pad, max: max + pad };
+}
+
+function xFor(t, g, range) {
+  const span = Math.max(1, range.until - range.since);
+  return g.x0 + ((t - range.since) / span) * g.pw;
+}
+
+function yFor(v, g, dom) {
+  return g.y0 + g.ph - ((v - dom.min) / (dom.max - dom.min)) * g.ph;
+}
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function draw() {
+  const { w, h } = setupCanvas();
+  const g = plotGeom(w, h);
+  ctx.clearRect(0, 0, w, h);
+
+  const grid = cssVar("--grid");
+  const muted = cssVar("--muted");
+  const planLine = cssVar("--plan-line");
+  const range = xRange();
+  const dom = yDomain();
+
+  ctx.strokeStyle = grid; ctx.fillStyle = muted;
+  ctx.lineWidth = 1; ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const v = dom.min + ((dom.max - dom.min) * i) / steps;
+    const y = yFor(v, g, dom);
+    ctx.beginPath(); ctx.moveTo(g.x0, y); ctx.lineTo(g.x0 + g.pw, y); ctx.stroke();
+    ctx.fillText(fmtCredits(v), g.x0 - 8, y);
+  }
+
+  if (state.points.length === 0) {
+    ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText("Not enough history in this range yet", g.x0 + g.pw / 2, g.y0 + g.ph / 2);
+    return;
+  }
+
+  if (state.planCredits != null) {
+    const y = yFor(state.planCredits, g, dom);
+    ctx.save();
+    ctx.strokeStyle = planLine;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(g.x0, y); ctx.lineTo(g.x0 + g.pw, y); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = COLOR_BALANCE;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  state.points.forEach((p, i) => {
+    const x = xFor(p.t, g, range);
+    const y = yFor(p.remaining, g, dom);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = COLOR_BALANCE;
+  for (const p of state.points) {
+    const x = xFor(p.t, g, range);
+    const y = yFor(p.remaining, g, dom);
+    ctx.beginPath();
+    ctx.arc(x, y, state.points.length > 1 ? 2.5 : 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+  ctx.fillText(fmtTime(range.since), g.x0, g.y0 + g.ph + 8);
+  ctx.textAlign = "right";
+  ctx.fillText(fmtTime(range.until), g.x0 + g.pw, g.y0 + g.ph + 8);
+}
+
+// ---- hover tooltip ---------------------------------------------------------
+function nearestPoint(points, targetT) {
+  let best = null, bestDist = Infinity;
+  for (const p of points) {
+    const dist = Math.abs(p.t - targetT);
+    if (dist < bestDist) { bestDist = dist; best = p; }
+  }
+  return best;
+}
+
+canvas.addEventListener("mousemove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const { w, h } = { w: rect.width, h: rect.height };
+  const g = plotGeom(w, h);
+  const px = e.clientX - rect.left;
+  if (px < g.x0 || px > g.x0 + g.pw) { tooltip.style.opacity = 0; return; }
+
+  const range = xRange();
+  const span = Math.max(1, range.until - range.since);
+  const targetT = range.since + ((px - g.x0) / g.pw) * span;
+
+  const p = nearestPoint(state.points, targetT);
+  if (!p) { tooltip.style.opacity = 0; return; }
+
+  tooltip.innerHTML = `<div class="t-time">${fmtTime(p.t)}</div>` +
+    `<div class="t-row"><span class="t-dot"></span>Remaining: <b>${fmtCredits(p.remaining)}</b></div>`;
+  tooltip.style.opacity = 1;
+  const tw = tooltip.offsetWidth;
+  let left = px + 14;
+  if (left + tw > w) left = px - tw - 14;
+  tooltip.style.left = left + "px";
+  tooltip.style.top = g.y0 + "px";
+});
+canvas.addEventListener("mouseleave", () => { tooltip.style.opacity = 0; });
+
+// ---- controls -------------------------------------------------------------
+document.getElementById("ranges").addEventListener("click", (e) => {
+  const btn = e.target.closest("button"); if (!btn) return;
+  document.querySelectorAll("#ranges button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  state.rangeMs = Number(btn.dataset.ms);
+  recompute();
+});
+window.addEventListener("resize", draw);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+
+// ---- boot -----------------------------------------------------------------
+document.getElementById("meta").textContent =
+  allData.length ? `${allData.length} samples · generated ${fmtTime(now)}` : "no history yet";
+document.getElementById("footer").textContent =
+  "Chart: remaining credit balance (auto-scaled y-axis; dashed line = current plan credits/cycle). " +
+  "Burn-rate table: Δ balance between polls, scaled to /h, /day, /wk. Static snapshot; regenerate from the panel menu or Settings to refresh.";
+recompute();
+</script>
+</body>
+</html>

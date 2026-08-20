@@ -1,0 +1,14 @@
+{
+  "name": "usage-daemon",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Localhost daemon that owns usage polling for the GNOME usage suite. Framework + runner; plugins today: ollama, claude, grok, mistral.",
+  "type": "module",
+  "bin": { "usage-daemon": "src/index.js" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" }
+}

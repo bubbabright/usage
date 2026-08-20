@@ -1,0 +1,82 @@
+/* Ollama Cloud Usage — panel styling.
+ *
+ * Goals: sit cleanly next to other panel indicators. Inherit the panel font
+ * (no hardcoded font-size), stay vertically centered, keep bars modest and
+ * theme-aware (tracks derive from the current foreground via currentColor-ish
+ * translucency, so they read on both light and dark shells). Identity colors
+ * (Okabe-Ito orange/blue) come from the daemon per-window and are applied inline
+ * to the fill only. */
+
+/* even, panel-native spacing between icon / bars / tier */
+.ollama-panel {
+    spacing: 6px;
+}
+
+.ollama-bar-box {
+    spacing: 4px;
+}
+
+/* letter inherits the panel font; slightly smaller + dimmed. Fixed width so the
+ * bars all start at the same x regardless of glyph (S vs W) — otherwise the two
+ * rows misalign in stacked mode. */
+.ollama-bar-letter {
+    font-size: 0.8em;
+    opacity: 0.75;
+    width: 15px;
+    text-align: center;
+}
+
+/* track: a subtle theme-derived groove, not a hard black box */
+.ollama-bar-track {
+    height: 11px;
+    border-radius: 6px;
+    background-color: rgba(127, 127, 127, 0.25);
+    border: 1px solid rgba(127, 127, 127, 0.30);
+    overflow: hidden;
+}
+
+/* fill: explicit height EQUAL to the track so it spans top-to-bottom (default
+ * layout anchors it top-left; inline width fills left-to-right). Matching the
+ * track height is what keeps the color from floating in the vertical middle. */
+.ollama-bar-fill {
+    height: 11px;
+    border-radius: 6px;
+}
+
+/* projected-depletion blink */
+.ollama-bar-track.ollama-bar-warn {
+    animation: ollama-pulse 1s ease-in-out infinite;
+}
+
+@keyframes ollama-pulse {
+    0%, 100% { border-color: rgba(213, 94, 0, 0.35); }
+    50%      { border-color: rgba(213, 94, 0, 1.0); }
+}
+
+/* tier badge: small, muted, capitalized to match ollama.com's pill */
+.ollama-tier {
+    font-size: 0.8em;
+    opacity: 0.7;
+    text-transform: capitalize;
+}
+
+/* dim the whole panel group when data is stale */
+.ollama-stale {
+    opacity: 0.55;
+}
+
+/* ---- menu ---- */
+.ollama-menu-header {
+    font-weight: bold;
+}
+
+.ollama-menu-tier {
+    opacity: 0.7;
+    text-transform: capitalize;
+    margin-left: 8px;
+}
+
+.ollama-menu-status {
+    font-size: 0.9em;
+    opacity: 0.8;
+}

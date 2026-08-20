@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="grok-usage">
+  <schema id="org.gnome.shell.extensions.grok-usage" path="/org/gnome/shell/extensions/grok-usage/">
+    <key name="refresh-interval" type="i">
+      <default>300</default>
+      <summary>Refresh interval (seconds)</summary>
+      <description>How often to poll monthly billing and weekly SuperGrok credits</description>
+    </key>
+    <key name="show-icon" type="b">
+      <default>true</default>
+      <summary>Show panel icon</summary>
+      <description>Whether to show the Grok logo in the top panel</description>
+    </key>
+    <key name="icon-style" type="s">
+      <default>'light'</default>
+      <summary>Icon style</summary>
+      <description>Grok logo variant: light (for dark panels), dark (for light panels), or color</description>
+    </key>
+    <key name="proxy-url" type="s">
+      <default>''</default>
+      <summary>Proxy URL</summary>
+      <description>HTTP proxy URL (e.g., http://localhost:11809). Leave empty to use no proxy.</description>
+    </key>
+    <key name="show-monthly-panel-bar" type="b">
+      <default>true</default>
+      <summary>Show monthly bar in panel</summary>
+      <description>Whether to show the monthly progress bar in the top panel, independent of its percentage text</description>
+    </key>
+    <key name="show-monthly-panel-text" type="b">
+      <default>true</default>
+      <summary>Show monthly percentage in panel</summary>
+      <description>Whether to show the monthly percentage text in the top panel, independent of its bar</description>
+    </key>
+    <key name="show-weekly-panel-bar" type="b">
+      <default>true</default>
+      <summary>Show weekly bar in panel</summary>
+      <description>When weekly data exists (auto poll), show its progress bar in the top panel, independent of its percentage text</description>
+    </key>
+    <key name="show-weekly-panel-text" type="b">
+      <default>true</default>
+      <summary>Show weekly percentage in panel</summary>
+      <description>When weekly data exists (auto poll), show its percentage text in the top panel, independent of its bar</description>
+    </key>
+    <key name="show-panel-bar" type="b">
+      <default>true</default>
+      <summary>Show progress bar in panel</summary>
+      <description>Whether to show the progress bar column on every metric row in the top panel</description>
+    </key>
+    <key name="show-panel-percent" type="b">
+      <default>true</default>
+      <summary>Show percentage in panel</summary>
+      <description>Whether to show the percentage-text column on every metric row in the top panel</description>
+    </key>
+    <key name="show-monthly" type="b">
+      <default>true</default>
+      <summary>Show monthly metric row</summary>
+      <description>Whether the monthly metric row appears in the top panel at all</description>
+    </key>
+    <key name="show-weekly" type="b">
+      <default>true</default>
+      <summary>Show weekly metric row</summary>
+      <description>Whether the weekly metric row appears in the top panel once auto-polled weekly data exists</description>
+    </key>
+    <key name="stack-panel-bars" type="b">
+      <default>false</default>
+      <summary>Stack panel bars vertically</summary>
+      <description>Whether to stack the monthly and weekly panel bars vertically instead of side by side</description>
+    </key>
+    <key name="show-bar-labels" type="b">
+      <default>true</default>
+      <summary>Show metric letter tag</summary>
+      <description>Show a single-letter metric tag (M = monthly, W = weekly) to the left of each panel bar so the two are distinguishable at a glance</description>
+    </key>
+    <key name="warn-on-projected-depletion" type="b">
+      <default>false</default>
+      <summary>Warn on projected depletion (ALPHA)</summary>
+      <description>Project current burn rate (from usage history) forward; if a limit is on track to hit 100% before its reset time, blink the affected panel bar orange/red or blue/red. Alpha feature — default off.</description>
+    </key>
+    <key name="last-fetch-succeeded" type="b">
+      <default>false</default>
+      <summary>Last monthly fetch succeeded</summary>
+      <description>Whether the most recent billing poll returned 200</description>
+    </key>
+    <key name="refresh-trigger" type="i">
+      <default>0</default>
+      <summary>Manual refresh trigger</summary>
+      <description>Incremented by prefs.js after the manual token-refresh subprocess completes. The running extension watches this key and immediately re-fetches usage instead of waiting for the next poll interval.</description>
+    </key>
+    <key name="flash-on-refresh" type="b">
+      <default>true</default>
+      <summary>Flash panel on refresh</summary>
+      <description>Brief flash when a live monthly poll succeeds</description>
+    </key>
+    <key name="csv-export-dir" type="s">
+      <default>''</default>
+      <summary>Last CSV export directory</summary>
+      <description>Directory the user last saved a usage-history CSV export to, remembered across sessions so the save dialog reopens there</description>
+    </key>
+  </schema>
+</schemalist>

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<!--
+  Grok usage-history report — self-contained artifact.
+
+  This file is a TEMPLATE. The extension (extension.js / prefs.js) reads
+  it, replaces the two placeholder tokens below with live data, writes the
+  result to ~/.cache/grok-usage/usage-report.html, and opens it in the
+  browser.
+
+  Placeholders (replaced verbatim, keep the exact strings):
+    /*__USAGE_DATA__*/[]     -> JSON array of history.jsonl entries:
+                                 {t, kind:'month', used, limit, pct,
+                                  period_start, period_end, on_demand_cap}
+                                 {t, kind:'week', weekly_pct}
+    /*__GENERATED_AT__*/0    -> Date.now() at generation time
+
+  Design goals:
+    - No external dependencies. No CDN, no fetch, no CORS. Opens offline
+      from file:// with data baked in.
+    - Canvas 2D, devicePixelRatio-aware so it stays crisp on HiDPI.
+    - Same Okabe-Ito colorblind-safe palette as the panel bars (monthly
+      blue #56B4E9, weekly orange #E69F00).
+    - Unlike the upstream Claude Usage report (a rolling 7-day total,
+      bucketed into "added per day" bars), monthly `pct` here is an
+      absolute point-in-time reading and weekly entries are sparse manual
+      samples — so this is a point/line series with markers, not a bar
+      chart of daily deltas.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grok Usage History</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #6b6b6b;
+    --grid: rgba(0,0,0,0.10); --card: #f4f4f5; --border: rgba(0,0,0,0.12);
+    --monthly: #56B4E9; --weekly: #E69F00; --crosshair: rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --fg: #ececec; --muted: #9a9a9a;
+      --grid: rgba(255,255,255,0.10); --card: #262626; --border: rgba(255,255,255,0.12);
+      --crosshair: rgba(255,255,255,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; gap: 6px; margin: 16px 0; flex-wrap: wrap; }
+  .controls button {
+    font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--fg);
+    cursor: pointer; transition: background 120ms, border-color 120ms;
+  }
+  .controls button:hover { border-color: var(--muted); }
+  .controls button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .legend { display: flex; gap: 18px; margin: 10px 0 14px; font-size: 13px; }
+  .legend .item { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .legend .item.off { opacity: 0.35; text-decoration: line-through; }
+  .chart-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 600; margin: 22px 0 8px;
+  }
+  .chart-title .swatch { width: 12px; height: 12px; border-radius: 3px; }
+  .chart-wrap { position: relative; width: 100%; }
+  canvas { width: 100%; height: 340px; display: block; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 5; opacity: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.5; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18); transition: opacity 80ms;
+  }
+  .tooltip .t-time { color: var(--muted); margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
+  .tooltip .t-dot { width: 9px; height: 9px; border-radius: 2px; }
+  .stats-panel {
+    margin-top: 20px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+  }
+  .stats-panel h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+  .stats-panel .hint { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .stats-table th, .stats-table td {
+    padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-table th:first-child, .stats-table td:first-child { text-align: left; font-weight: 600; }
+  .stats-table thead th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .stats-table tbody tr:last-child td { border-bottom: none; }
+  .stats-table .dash { color: var(--muted); font-weight: 400; }
+  .empty { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
+  footer { margin-top: 22px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Grok Usage History</h1>
+    <span class="sub" id="meta"></span>
+  </header>
+
+  <div class="controls" id="ranges">
+    <button data-ms="86400000">24 Hours</button>
+    <button data-ms="604800000" class="active">7 Days</button>
+    <button data-ms="2592000000">30 Days</button>
+    <button data-ms="0">All Time</button>
+  </div>
+
+  <div class="legend" id="legend">
+    <div class="item" data-series="monthly"><span class="swatch" style="background:var(--monthly)"></span>Monthly (auto)</div>
+    <div class="item" data-series="weekly"><span class="swatch" style="background:var(--weekly)"></span>Weekly (manual)</div>
+  </div>
+
+  <div class="chart-wrap" id="chart-view">
+    <canvas id="chart"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <div class="stats-panel" id="stats-panel">
+    <h3>Monthly limit burn rate</h3>
+    <p class="hint">% of monthly billing limit consumed per period, from consecutive auto-polls. Cells show - until enough samples exist.</p>
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Now</th>
+          <th>Avg</th>
+          <th>Peak (date)</th>
+        </tr>
+      </thead>
+      <tbody id="stats-rows"></tbody>
+    </table>
+  </div>
+  <footer id="footer"></footer>
+
+<script>
+"use strict";
+
+// ---- injected by the generator (see comment block at top of file) --------
+const USAGE_DATA = /*__USAGE_DATA__*/[];
+const GENERATED_AT = /*__GENERATED_AT__*/0;
+// --------------------------------------------------------------------------
+
+const COLOR_MONTHLY = "#56B4E9";
+const COLOR_WEEKLY = "#E69F00";
+const PAD = { top: 16, right: 16, bottom: 28, left: 40 };
+const HOUR_MS = 3600000;
+const DAY_MS = 86400000;
+const WEEK_MS = 7 * DAY_MS;
+const DASH = "-";
+
+const state = {
+  rangeMs: 604800000, // default: 7 days
+  monthly: [],         // filtered {t, pct}
+  weekly: [],          // filtered {t, pct}
+  seriesOn: { monthly: true, weekly: true },
+};
+
+const canvas = document.getElementById("chart");
+const ctx = canvas.getContext("2d");
+const tooltip = document.getElementById("tooltip");
+
+const allData = (USAGE_DATA || []).filter(d => d && typeof d.t === "number").sort((a, b) => a.t - b.t);
+const monthlyAll = allData
+  .filter(d => d.kind === "month" && typeof d.pct === "number")
+  .map(d => ({ t: d.t, pct: clamp(d.pct), used: d.used, limit: d.limit }));
+const weeklyAll = allData
+  .filter(d => d.kind === "week" && typeof d.weekly_pct === "number")
+  .map(d => ({ t: d.t, pct: clamp(d.weekly_pct) }));
+
+const now = GENERATED_AT || Date.now();
+
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+
+function fmtTime(ms) {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtShortDate(ms) {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtRate(v, suffix) {
+  if (!Number.isFinite(v)) return DASH;
+  const digits = v < 10 ? 2 : 1;
+  return `${v.toFixed(digits)}%${suffix}`;
+}
+
+function consecutiveIntervals(points) {
+  const out = [];
+  for (let i = 1; i < points.length; i++) {
+    const dt = points[i].t - points[i - 1].t;
+    if (dt <= 0) continue;
+    out.push({
+      t: points[i].t,
+      dt,
+      dp: Math.max(0, points[i].pct - points[i - 1].pct),
+    });
+  }
+  return out;
+}
+
+// Burn rate (% of monthly limit per hour/day/week) from poll-to-poll deltas.
+// Each cell stays — until its own minimum sample rule is met.
+function periodRowStats(points, periodMs, minSpanMs, suffix) {
+  const ivs = consecutiveIntervals(points).filter(iv => iv.dt >= minSpanMs);
+  const rate = iv => iv.dp / (iv.dt / periodMs);
+
+  let now = DASH;
+  if (ivs.length >= 1)
+    now = fmtRate(rate(ivs[ivs.length - 1]), suffix);
+
+  let avg = DASH;
+  if (ivs.length >= 2) {
+    const rates = ivs.map(rate);
+    avg = fmtRate(rates.reduce((a, b) => a + b, 0) / rates.length, suffix);
+  }
+
+  let peak = DASH;
+  if (ivs.length >= 2) {
+    let best = ivs[0], bestVal = rate(best);
+    for (const iv of ivs) {
+      const r = rate(iv);
+      if (r > bestVal) { bestVal = r; best = iv; }
+    }
+    peak = `${fmtRate(bestVal, suffix)} · ${fmtShortDate(best.t)}`;
+  }
+
+  return { now, avg, peak };
+}
+
+function recompute() {
+  const since = state.rangeMs ? now - state.rangeMs : 0;
+  state.monthly = monthlyAll.filter(d => d.t >= since);
+  state.weekly = weeklyAll.filter(d => d.t >= since);
+  renderStatsTable();
+  draw();
+}
+
+function renderStatsTable() {
+  const el = document.getElementById("stats-rows");
+  el.innerHTML = "";
+
+  const rows = [
+    { label: "Hourly", ...periodRowStats(state.monthly, HOUR_MS, 30 * 60 * 1000, "/h") },
+    { label: "Daily", ...periodRowStats(state.monthly, DAY_MS, 6 * HOUR_MS, "/day") },
+    { label: "Weekly", ...periodRowStats(state.monthly, WEEK_MS, DAY_MS, "/wk") },
+  ];
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const cell = (val) => {
+      const dash = val === DASH;
+      return `<td${dash ? ' class="dash"' : ""}>${val}</td>`;
+    };
+    tr.innerHTML =
+      `<td>${row.label}</td>` +
+      cell(row.now) + cell(row.avg) + cell(row.peak);
+    el.appendChild(tr);
+  }
+}
+
+function setupCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: rect.width, h: rect.height };
+}
+
+function plotGeom(w, h) {
+  return {
+    x0: PAD.left, y0: PAD.top,
+    pw: w - PAD.left - PAD.right,
+    ph: h - PAD.top - PAD.bottom,
+  };
+}
+
+function xRange() {
+  const since = state.rangeMs ? now - state.rangeMs : Math.min(
+    state.monthly.length ? state.monthly[0].t : now,
+    state.weekly.length ? state.weekly[0].t : now
+  );
+  return { since, until: now };
+}
+
+function xFor(t, g, range) {
+  const span = Math.max(1, range.until - range.since);
+  return g.x0 + ((t - range.since) / span) * g.pw;
+}
+
+function yFor(v, g) { return g.y0 + g.ph - (clamp(v) / 100) * g.ph; }
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function drawSeriesLine(points, color, g, range) {
+  if (points.length === 0) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = xFor(p.t, g, range);
+    const y = yFor(p.pct, g);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  for (const p of points) {
+    const x = xFor(p.t, g, range);
+    const y = yFor(p.pct, g);
+    ctx.beginPath();
+    ctx.arc(x, y, points.length > 1 ? 2.5 : 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function draw() {
+  const { w, h } = setupCanvas();
+  const g = plotGeom(w, h);
+  ctx.clearRect(0, 0, w, h);
+
+  const grid = cssVar("--grid");
+  const muted = cssVar("--muted");
+  const range = xRange();
+
+  ctx.strokeStyle = grid; ctx.fillStyle = muted;
+  ctx.lineWidth = 1; ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let pct = 0; pct <= 100; pct += 25) {
+    const y = yFor(pct, g);
+    ctx.beginPath(); ctx.moveTo(g.x0, y); ctx.lineTo(g.x0 + g.pw, y); ctx.stroke();
+    ctx.fillText(pct + "%", g.x0 - 8, y);
+  }
+
+  if (state.monthly.length === 0 && state.weekly.length === 0) {
+    ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText("Not enough history in this range yet", g.x0 + g.pw / 2, g.y0 + g.ph / 2);
+    return;
+  }
+
+  if (state.seriesOn.monthly) drawSeriesLine(state.monthly, COLOR_MONTHLY, g, range);
+  if (state.seriesOn.weekly) drawSeriesLine(state.weekly, COLOR_WEEKLY, g, range);
+
+  // X axis labels: first / last timestamp in range
+  ctx.fillStyle = muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+  ctx.fillText(fmtTime(range.since), g.x0, g.y0 + g.ph + 8);
+  ctx.textAlign = "right";
+  ctx.fillText(fmtTime(range.until), g.x0 + g.pw, g.y0 + g.ph + 8);
+}
+
+// ---- hover tooltip ---------------------------------------------------------
+function nearestPoint(points, targetT) {
+  let best = null, bestDist = Infinity;
+  for (const p of points) {
+    const dist = Math.abs(p.t - targetT);
+    if (dist < bestDist) { bestDist = dist; best = p; }
+  }
+  return best;
+}
+
+canvas.addEventListener("mousemove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const { w, h } = { w: rect.width, h: rect.height };
+  const g = plotGeom(w, h);
+  const px = e.clientX - rect.left;
+  if (px < g.x0 || px > g.x0 + g.pw) { tooltip.style.opacity = 0; return; }
+
+  const range = xRange();
+  const span = Math.max(1, range.until - range.since);
+  const targetT = range.since + ((px - g.x0) / g.pw) * span;
+
+  const rows = [];
+  if (state.seriesOn.monthly) {
+    const m = nearestPoint(state.monthly, targetT);
+    if (m) rows.push({ color: COLOR_MONTHLY, label: "Monthly", val: m.pct, t: m.t });
+  }
+  if (state.seriesOn.weekly) {
+    const wk = nearestPoint(state.weekly, targetT);
+    if (wk) rows.push({ color: COLOR_WEEKLY, label: "Weekly", val: wk.pct, t: wk.t });
+  }
+  if (!rows.length) { tooltip.style.opacity = 0; return; }
+
+  const time = fmtTime(rows[0].t);
+  tooltip.innerHTML = `<div class="t-time">${time}</div>` +
+    rows.map(r => `<div class="t-row"><span class="t-dot" style="background:${r.color}"></span>${r.label}: <b>${r.val.toFixed(1)}%</b></div>`).join("");
+  tooltip.style.opacity = 1;
+  const tw = tooltip.offsetWidth;
+  let left = px + 14;
+  if (left + tw > w) left = px - tw - 14;
+  tooltip.style.left = left + "px";
+  tooltip.style.top = g.y0 + "px";
+});
+canvas.addEventListener("mouseleave", () => { tooltip.style.opacity = 0; });
+
+// ---- legend toggle ---------------------------------------------------------
+document.getElementById("legend").addEventListener("click", (e) => {
+  const item = e.target.closest(".item"); if (!item) return;
+  const series = item.dataset.series;
+  state.seriesOn[series] = !state.seriesOn[series];
+  item.classList.toggle("off", !state.seriesOn[series]);
+  draw();
+});
+
+// ---- controls -------------------------------------------------------------
+document.getElementById("ranges").addEventListener("click", (e) => {
+  const btn = e.target.closest("button"); if (!btn) return;
+  document.querySelectorAll("#ranges button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  state.rangeMs = Number(btn.dataset.ms);
+  recompute();
+});
+window.addEventListener("resize", draw);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+
+// ---- boot -----------------------------------------------------------------
+document.getElementById("meta").textContent =
+  allData.length ? `${allData.length} samples · generated ${fmtTime(now)}` : "no history yet";
+document.getElementById("footer").textContent =
+  "Chart: monthly billing % (auto) and weekly % (manual). Burn-rate table: Δ monthly % between polls, scaled to /h, /day, /wk. " +
+  "Okabe-Ito palette. Static snapshot; regenerate from the panel menu or Settings to refresh.";
+recompute();
+</script>
+</body>
+</html>

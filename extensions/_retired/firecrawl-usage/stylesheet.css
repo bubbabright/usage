@@ -1,0 +1,146 @@
+/* Panel */
+.firecrawl-usage-icon {
+    margin-right: 0.4em;
+    color: #D55E00;
+}
+
+.firecrawl-usage-label {
+    font-weight: 700;
+    color: #D55E00;
+}
+
+.firecrawl-panel-percent {
+    margin-left: 0.27em;
+}
+
+.is-dark .firecrawl-panel-flash {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 0.27em;
+}
+
+.is-light .firecrawl-panel-flash {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 0.27em;
+}
+
+.firecrawl-panel-progress-bg {
+    border-radius: 0.2em;
+    height: 0.8em;
+    width: 3.75em;
+    margin-left: 0.27em;
+}
+
+.is-dark .firecrawl-panel-progress-bg {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.is-light .firecrawl-panel-progress-bg {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.firecrawl-panel-progress-bar {
+    height: 0.8em;
+    border-radius: 0.2em;
+    background-color: #D55E00;
+}
+
+.firecrawl-panel-progress-bar-warning {
+    height: 0.8em;
+    border-radius: 0.2em;
+    background-color: #ef4444;
+}
+
+.firecrawl-hover-tooltip {
+    font-size: 0.8em;
+    border-radius: 0.4em;
+    padding: 0.27em 0.53em;
+}
+
+.is-dark .firecrawl-hover-tooltip {
+    color: #ececec;
+    background-color: rgba(20, 20, 20, 0.92);
+}
+
+.is-light .firecrawl-hover-tooltip {
+    color: #1a1a1a;
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.firecrawl-stale {
+    opacity: 0.45;
+}
+
+.firecrawl-stale-banner {
+    font-size: 0.87em;
+    font-weight: 600;
+    color: #eab308;
+    padding: 0.13em 0.27em;
+}
+
+.firecrawl-menu-header {
+    padding: 0.27em 0.4em;
+}
+
+.firecrawl-menu-title {
+    font-weight: bold;
+}
+
+.firecrawl-refresh-button {
+    border-radius: 0.4em;
+    padding: 0.27em;
+}
+
+.is-dark .firecrawl-refresh-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.is-light .firecrawl-refresh-button:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.firecrawl-section-title {
+    font-size: 0.87em;
+    font-weight: 600;
+}
+
+.is-dark .firecrawl-section-title {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.is-light .firecrawl-section-title {
+    color: rgba(0, 0, 0, 0.65);
+}
+
+.firecrawl-percent-label {
+    font-size: 0.93em;
+    font-weight: 600;
+}
+
+.firecrawl-reset-label {
+    font-size: 0.8em;
+}
+
+.is-dark .firecrawl-reset-label {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.is-light .firecrawl-reset-label {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+.firecrawl-menu-muted {
+    font-size: 0.87em;
+}
+
+.is-dark .firecrawl-menu-muted {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.is-light .firecrawl-menu-muted {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+.firecrawl-usage-section {
+    padding: 0.4em 0.8em;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Grok Usage",
+  "description": "Show SuperGrok / Grok Build usage in the top panel. Polls monthly billing and weekly SuperGrok credits (GetGrokCreditsConfig). Not affiliated with xAI.",
+  "uuid": "grok-usage@bubbabright",
+  "shell-version": [
+    "46",
+    "47",
+    "48",
+    "49"
+  ],
+  "url": "https://github.com/bubbabright/supergrok-usage-extension",
+  "settings-schema": "org.gnome.shell.extensions.grok-usage",
+  "version": 3,
+  "session-modes": [
+    "user"
+  ]
+}

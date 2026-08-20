@@ -1,0 +1,17 @@
+{
+  "name": "Firecrawl Usage",
+  "description": "Show Firecrawl credit balance in the top panel. Polls GET /v2/team/credit-usage using the API key stored by the firecrawl CLI. Not affiliated with Firecrawl/Mendable.",
+  "uuid": "firecrawl-usage@bubbabright",
+  "shell-version": [
+    "46",
+    "47",
+    "48",
+    "49"
+  ],
+  "url": "https://github.com/bubbabright/firecrawl-usage-extension",
+  "settings-schema": "org.gnome.shell.extensions.firecrawl-usage",
+  "version": 1,
+  "session-modes": [
+    "user"
+  ]
+}

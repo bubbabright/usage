@@ -1,0 +1,25 @@
+port = 8787
+
+[providers.ollama]
+enabled = true
+interval_seconds = 300
+cookie_file = "~/.config/usage-daemon/ollama.cookie"
+
+[providers.claude]
+enabled = true
+interval_seconds = 300
+
+[providers.grok]
+enabled = true
+interval_seconds = 300
+
+[providers.mistral]
+enabled = true
+interval_seconds = 300
+cookie_file = "~/.config/usage-daemon/mistral.cookie"
+
+[providers.opencode-go]
+enabled = true
+interval_seconds = 300
+cookie_file = "~/.config/usage-daemon/opencode-go.cookie"
+workspace_id = "wrk_01KX9539EQF6MYWDM1SMYBPS1E"

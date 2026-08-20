@@ -1,0 +1,58 @@
+# usage-daemon config — copy to ~/.config/usage-daemon/config.toml
+# The daemon binds 127.0.0.1 only.
+
+port = 8787
+
+[providers.ollama]
+enabled = true
+interval_seconds = 300
+# Ollama's website auths on the browser SESSION COOKIE, not the API key.
+# Copy it from DevTools -> Application -> Cookies -> ollama.com (the whole
+# "name=value; name2=value2" cookie header), into this file:
+cookie_file = "~/.config/usage-daemon/ollama.cookie"
+# ...or inline instead of a file:
+# cookie = "session=...; other=..."
+
+[providers.claude]
+enabled = true
+interval_seconds = 300
+# Reads ~/.claude/.credentials.json ($CLAUDE_CONFIG_DIR override respected)
+# directly -- the same OAuth token the Claude Code CLI uses. Daemon never
+# writes this file. No cookie needed.
+# credentials_path = "~/.claude/.credentials.json"  # optional override
+
+[providers.grok]
+enabled = true
+interval_seconds = 300
+# Reads ~/.grok/auth.json (the OAuth token the `grok` CLI manages, from
+# `grok login`) directly. Daemon never writes this file. Monthly comes from
+# cli-chat-proxy.grok.com/v1/billing; weekly SuperGrok % is auto-fetched from
+# grok.com's gRPC-web GetGrokCreditsConfig (best-effort). No cookie needed.
+# auth_path = "~/.grok/auth.json"  # optional override
+
+[providers.mistral]
+enabled = false
+interval_seconds = 300
+# Vibe free-tier meter (admin.mistral.ai tRPC billing.vibeUsage) uses the
+# browser SESSION COOKIE, not an inference API key — same model as ollama.
+# Copy from DevTools -> Application -> Cookies -> admin.mistral.ai:
+cookie_file = "~/.config/usage-daemon/mistral.cookie"
+# ...or inline:
+# cookie = "..."
+# Optional Admin-role API key for monthly_spend ($ vs cap). Member/Billing
+# keys 403. Daemon never writes this file; never calls POST /spend-limit.
+# admin_key_file = "~/.config/usage-daemon/mistral.admin.key"
+# admin_key = "..."
+
+[providers.opencode-go]
+enabled = false
+interval_seconds = 300
+# OpenCode Go's workspace "Go" page auths on the browser SESSION COOKIE.
+# Copy from DevTools -> Application -> Cookies -> opencode.ai (whole
+# "name=value; ..." header):
+cookie_file = "~/.config/usage-daemon/opencode-go.cookie"
+# ...or inline:
+# cookie = "auth=Fe26.2**...; ..."
+# Optional: pin the workspace id (wrk_...) shown in the dashboard URL. If
+# omitted, the daemon auto-discovers it from an authed page on first fetch.
+# workspace_id = "wrk_..."

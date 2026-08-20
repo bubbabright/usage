@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+cd ..
+
+if [ -d claude-usage-extension ]; then
+	rm -rf ~/.local/share/gnome-shell/extensions/claude-code-usage@haletran.com
+	cp -r claude-usage-extension ~/.local/share/gnome-shell/extensions/claude-code-usage@haletran.com 
+	cd ~/.local/share/gnome-shell/extensions/claude-code-usage@haletran.com/schemas
+	glib-compile-schemas .
+	gnome-session-quit --no-prompt
+else
+	echo "Extension folder not found"
+fi

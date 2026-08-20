@@ -1,0 +1,249 @@
+/* Panel button styles */
+.claude-icon {
+    margin-right: 0.4em;
+}
+
+.claude-usage-label {
+    font-weight: bold;
+}
+
+/* Panel percent labels — same identity colors as the meter cells */
+.claude-panel-label-five-hour {
+    color: #E69F00;
+}
+
+.claude-panel-label-seven-day {
+    color: #56B4E9;
+}
+
+/* Tag label sits left of the meter — fixed width so '5' and 'W' occupy
+   equal space. em-based so it tracks stacked-mode inline font scaling. */
+.claude-panel-tag {
+    margin-right: 0.27em;
+    width: 1.1em;
+    text-align: center;
+}
+
+.claude-panel-percent {
+    margin-left: 0.27em;
+}
+
+/* Meter cells — each metric is ONE St.Widget with Clutter.Canvas drawing
+   the gradient fill as its background. Tag + percent labels float on top. */
+.claude-meter-cell {
+    border-radius: 0.2em;
+    min-width: 3.75em;
+    height: 0.8em;
+    margin: 0 0.15em;
+}
+
+.claude-meter-inner {
+    padding: 0 0.27em;
+}
+
+/* One-shot flash on the whole panel indicator right after a live refresh
+   lands — settings-gated feedback that new data just arrived. */
+.is-dark .claude-panel-flash {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 0.27em;
+}
+
+.is-light .claude-panel-flash {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 0.27em;
+}
+
+/* Stacked panel bars — label font-size/line-height and cell height scale
+   with text-scaling-factor via inline styles set by _applyPanelSizing(). */
+.panel-bars-stacked .claude-meter-cell {
+    margin: 0;
+}
+
+.panel-bars-stacked .claude-usage-label {
+    padding: 0;
+}
+
+.panel-bars-stacked .claude-meter-cell {
+    min-width: 48px;
+}
+
+/* Stale overlay: dim panel label + bars when showing last-known (cached)
+   numbers after a failed fetch (e.g. expired token). */
+.claude-stale {
+    opacity: 0.45;
+}
+
+.claude-stale-banner {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #eab308;
+    padding: 0.13em 0.27em;
+}
+
+/* Dropdown header row */
+.claude-menu-header {
+    padding: 0.27em 0 0.53em 0;
+}
+
+.claude-menu-title {
+    font-weight: 700;
+}
+
+.claude-refresh-button {
+    border-radius: 0.27em;
+    padding: 0.27em;
+}
+
+.is-dark .claude-refresh-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.is-light .claude-refresh-button:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Usage section styles */
+.claude-usage-section {
+    padding: 0.27em 0;
+    spacing: 0.4em;
+    min-width: 14em;
+}
+
+.claude-section-title {
+    font-size: 0.87em;
+    font-weight: 600;
+}
+
+.is-dark .claude-section-title {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.is-light .claude-section-title {
+    color: rgba(0, 0, 0, 0.65);
+}
+
+.claude-percent-label {
+    font-size: 0.87em;
+    font-weight: bold;
+}
+
+/* Progress bar styles */
+.claude-progress-bg {
+    border-radius: 0.27em;
+    height: 0.53em;
+    width: 13.3em;
+    margin: 0.27em 0;
+}
+
+.is-dark .claude-progress-bg {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.is-light .claude-progress-bg {
+    background-color: rgba(0, 0, 0, 0.12);
+}
+
+.claude-progress-bar {
+    height: 0.53em;
+    border-radius: 0.27em;
+    transition: width 300ms ease-out;
+}
+
+/* Identity colors — match the panel bars so each metric keeps ONE color
+   everywhere (5-hour orange, 7-day blue), never severity-shifting. */
+.claude-progress-bar.claude-bar-five-hour {
+    background-color: #E69F00;
+}
+
+.claude-progress-bar.claude-bar-seven-day {
+    background-color: #56B4E9;
+}
+
+/* Dynamic per-model/plan limit bars — neutral identity, distinct from the
+   two headline metrics. */
+.claude-progress-bar.claude-bar-extra {
+    background-color: #b0b0b0;
+}
+
+/* Reset label styles */
+.claude-reset-label {
+    font-size: 0.73em;
+}
+
+.is-dark .claude-reset-label {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.is-light .claude-reset-label {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+/* Footer styles */
+.claude-footer-box {
+    padding: 0.4em 0;
+    spacing: 0.8em;
+}
+
+.claude-refresh-button {
+    padding: 0.27em 0.8em;
+    border-radius: 0.27em;
+    font-size: 0.8em;
+}
+
+.is-dark .claude-refresh-button {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.is-light .claude-refresh-button {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.is-dark .claude-refresh-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.is-light .claude-refresh-button:hover {
+    background-color: rgba(0, 0, 0, 0.12);
+}
+
+.is-dark .claude-refresh-button:active {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.is-light .claude-refresh-button:active {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.claude-last-updated-label {
+    font-size: 0.67em;
+    font-style: italic;
+}
+
+.is-dark .claude-last-updated-label {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.is-light .claude-last-updated-label {
+    color: rgba(0, 0, 0, 0.45);
+}
+
+/* Floating tooltip shown on hovering the panel indicator — last successful
+   fetch time, independent of whatever's currently displayed (live, stale,
+   or backed off). */
+.claude-hover-tooltip {
+    border-radius: 0.4em;
+    padding: 0.27em 0.53em;
+    font-size: 0.73em;
+}
+
+.is-dark .claude-hover-tooltip {
+    background-color: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e0e0e0;
+}
+
+.is-light .claude-hover-tooltip {
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    color: #1a1a1a;
+}

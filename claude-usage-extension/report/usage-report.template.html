@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<!--
+  Claude usage-history report — self-contained artifact.
+
+  This file is a TEMPLATE. The extension (prefs.js) reads it, replaces the
+  two placeholder tokens below with live data, writes the result to
+  ~/.cache/claude-code-usage/usage-report.html, and opens it in the browser.
+
+  Placeholders (replaced verbatim, keep the exact strings):
+    /*__USAGE_DATA__*/[]     -> JSON array of {t, five_hour, seven_day}
+    /*__GENERATED_AT__*/0    -> Date.now() at generation time
+
+  Design goals:
+    - No external dependencies. No CDN, no fetch, no CORS. Opens offline
+      from file:// with data baked in.
+    - Canvas 2D, devicePixelRatio-aware so it stays crisp on HiDPI.
+    - Same Okabe-Ito colorblind-safe palette as the panel bars.
+    - When the daemon lands (see HANDOFF.md, Phase 1), swap the inlined
+      USAGE_DATA for `await fetch('/usage/history')` — nothing else changes.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Usage History</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #6b6b6b;
+    --grid: rgba(0,0,0,0.10); --card: #f4f4f5; --border: rgba(0,0,0,0.12);
+    --five: #E69F00; --seven: #56B4E9; --crosshair: rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --fg: #ececec; --muted: #9a9a9a;
+      --grid: rgba(255,255,255,0.10); --card: #262626; --border: rgba(255,255,255,0.12);
+      --crosshair: rgba(255,255,255,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; gap: 6px; margin: 16px 0; flex-wrap: wrap; }
+  .controls button {
+    font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--fg);
+    cursor: pointer; transition: background 120ms, border-color 120ms;
+  }
+  .controls button:hover { border-color: var(--muted); }
+  .controls button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .legend { display: flex; gap: 18px; margin: 10px 0 14px; font-size: 13px; }
+  .legend .item { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .legend .item.off { opacity: 0.35; text-decoration: line-through; }
+  .chart-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 600; margin: 22px 0 8px;
+  }
+  .chart-title .swatch { width: 12px; height: 12px; border-radius: 3px; }
+  .chart-wrap { position: relative; width: 100%; }
+  canvas { width: 100%; height: 340px; display: block; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 5; opacity: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.5; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18); transition: opacity 80ms;
+  }
+  .tooltip .t-time { color: var(--muted); margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
+  .tooltip .t-dot { width: 9px; height: 9px; border-radius: 2px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .card .stat { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .card .stat .k { color: var(--muted); }
+  .card .stat .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .empty { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
+  .weekday { display: flex; gap: 10px; align-items: flex-end; height: 140px; padding: 8px 4px; }
+  .wd-bar { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+  .wd-val { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+  .wd-track { width: 100%; flex: 1; display: flex; align-items: flex-end; background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .wd-fill { width: 100%; background: var(--seven); border-radius: 2px 2px 0 0; min-height: 2px; }
+  .wd-fill.today { background: var(--five); }
+  .wd-label { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .calendar { display: none; }
+  .calendar.active { display: block; }
+  .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+  .cal-dow div { font-size: 11px; color: var(--muted); text-align: center; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-cell {
+    aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--fg); position: relative;
+  }
+  .cal-cell.empty { border-color: transparent; }
+  .cal-cell .cal-day { font-size: 10px; color: var(--muted); position: absolute; top: 3px; left: 5px; }
+  .cal-cell .cal-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  footer { margin-top: 22px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Claude Usage History</h1>
+    <span class="sub" id="meta"></span>
+  </header>
+
+  <div class="controls" id="ranges">
+    <button data-ms="604800000" class="active">7 Days</button>
+    <button data-ms="2592000000">30 Days</button>
+    <button data-ms="0">All Time</button>
+  </div>
+
+  <h2 class="chart-title" id="chart-heading"><span class="swatch" style="background:var(--seven)"></span>7-Day Usage — added per day</h2>
+  <div class="chart-wrap" id="bar-view">
+    <canvas id="chart-seven_day"></canvas>
+    <div class="tooltip" id="tooltip-seven_day"></div>
+  </div>
+  <div class="calendar" id="cal-view">
+    <div class="cal-dow" id="cal-dow"></div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
+  <h2 class="chart-title">Day-of-Week Pattern <span class="sub" style="font-weight:400;">average added per weekday, all-time</span></h2>
+  <div class="weekday" id="weekday"></div>
+
+  <div class="cards" id="cards"></div>
+  <footer id="footer"></footer>
+
+<script>
+"use strict";
+
+// ---- injected by the generator (see comment block at top of file) --------
+const USAGE_DATA = /*__USAGE_DATA__*/[];
+const GENERATED_AT = /*__GENERATED_AT__*/0;
+// --------------------------------------------------------------------------
+
+const KEY = "seven_day";
+const COLOR = "#56B4E9";
+const LABEL = "7-Day";
+const PAD = { top: 16, right: 16, bottom: 28, left: 40 };
+
+const state = {
+  rangeMs: 604800000,          // default: 7 days
+  points: [],                  // filtered to range, time-sorted
+  bars: [],                    // one entry per bucket: {t, peak}
+};
+
+const canvas = document.getElementById("chart-seven_day");
+const ctx = canvas.getContext("2d");
+const tooltip = document.getElementById("tooltip-seven_day");
+
+const data = (USAGE_DATA || [])
+  .filter(d => d && typeof d.t === "number")
+  .sort((a, b) => a.t - b.t);
+
+const now = GENERATED_AT || Date.now();
+
+function fmtTime(ms) {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+const DAY_MS = 86400000;
+
+function fmtBucket(ms) {
+  const d = new Date(ms);
+  // Lead with the weekday — that's the whole point of a day-of-week
+  // pattern, "Jul 6" alone doesn't tell you it was a Monday.
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+
+// seven_day is a ROLLING running-total percentage (trailing 7 days), not a
+// per-day amount — so the peak of the raw value in a bucket just tracks the
+// ambient total (always ~60-70%), not what actually happened that day. Bar
+// height is instead the DELTA within the bucket (last sample - first
+// sample, floored at 0): how much the rolling total actually climbed that
+// day. Floored because the rolling window can also drop within a bucket as
+// old usage ages out faster than new usage is added — that's not "negative
+// usage", it's noise from the window itself, not something to chart as a bar.
+function bucketize(points, bucketMs) {
+  const buckets = new Map(); // bucketStart -> {first, last}
+  for (const p of points) {
+    const bucketStart = Math.floor(p.t / bucketMs) * bucketMs;
+    const v = clamp(p[KEY] ?? 0);
+    const b = buckets.get(bucketStart);
+    if (!b) buckets.set(bucketStart, { first: v, last: v });
+    else b.last = v;
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, b]) => ({ t, added: Math.max(0, b.last - b.first) }));
+}
+
+function recompute() {
+  const since = state.rangeMs ? now - state.rangeMs : 0;
+  state.points = data.filter(d => d.t >= since);
+  state.bars = bucketize(state.points, DAY_MS);
+  renderCards();
+  draw();
+}
+
+// Day-of-week usage pattern — computed from ALL daily buckets regardless of
+// the range selector, since "which weekdays run hot" is a pattern that
+// needs the full history to be meaningful, not just whatever window is
+// currently zoomed in.
+function renderWeekdayPattern() {
+  const dailyBars = bucketize(data, DAY_MS);
+  const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const sums = Array(7).fill(0), counts = Array(7).fill(0);
+  for (const bar of dailyBars) {
+    const dow = new Date(bar.t).getDay();
+    sums[dow] += bar.added;
+    counts[dow]++;
+  }
+  const avgs = names.map((_, i) => (counts[i] ? sums[i] / counts[i] : 0));
+  const maxAvg = Math.max(1, ...avgs);
+  const todayDow = new Date(now).getDay();
+
+  const el = document.getElementById("weekday");
+  el.innerHTML = "";
+  for (let i = 0; i < 7; i++) {
+    const pct = counts[i] ? Math.max(4, (avgs[i] / maxAvg) * 100) : 0;
+    const col = document.createElement("div");
+    col.className = "wd-bar";
+    col.innerHTML = `
+      <div class="wd-val">${counts[i] ? avgs[i].toFixed(1) + "%" : "-"}</div>
+      <div class="wd-track"><div class="wd-fill${i === todayDow ? " today" : ""}" style="height:${pct}%"></div></div>
+      <div class="wd-label">${names[i]}</div>`;
+    el.appendChild(col);
+  }
+}
+
+function seriesStats() {
+  const vals = state.points.map(p => clamp(p[KEY] ?? 0));
+  if (!vals.length) return null;
+  const current = vals[vals.length - 1];
+  const peak = Math.max(...vals);
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return { current, peak, avg };
+}
+
+function renderCards() {
+  const el = document.getElementById("cards");
+  el.innerHTML = "";
+  const s = seriesStats();
+  const card = document.createElement("div");
+  card.className = "card";
+  const rows = s
+    ? `<div class="stat"><span class="k">Current</span><span class="v">${s.current.toFixed(1)}%</span></div>
+       <div class="stat"><span class="k">Peak</span><span class="v">${s.peak.toFixed(1)}%</span></div>
+       <div class="stat"><span class="k">Average</span><span class="v">${s.avg.toFixed(1)}%</span></div>`
+    : `<div class="stat"><span class="k">No data in range</span><span class="v">-</span></div>`;
+  card.innerHTML = `<h3><span class="swatch" style="width:12px;height:12px;border-radius:3px;background:${COLOR}"></span>${LABEL} Utilization</h3>${rows}`;
+  el.appendChild(card);
+}
+
+function setupCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: rect.width, h: rect.height };
+}
+
+function plotGeom(w, h) {
+  return {
+    x0: PAD.left, y0: PAD.top,
+    pw: w - PAD.left - PAD.right,
+    ph: h - PAD.top - PAD.bottom,
+  };
+}
+
+function yFor(v, g) { return g.y0 + g.ph - (clamp(v) / 100) * g.ph; }
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function barGeom(g) {
+  const n = state.bars.length;
+  const slot = g.pw / n;
+  const barWidth = Math.max(2, slot * 0.7);
+  return { n, slot, barWidth };
+}
+
+function draw() {
+  const { w, h } = setupCanvas();
+  const g = plotGeom(w, h);
+  ctx.clearRect(0, 0, w, h);
+
+  const grid = cssVar("--grid");
+  const muted = cssVar("--muted");
+
+  // Y gridlines + labels 0..100
+  ctx.strokeStyle = grid; ctx.fillStyle = muted;
+  ctx.lineWidth = 1; ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let pct = 0; pct <= 100; pct += 25) {
+    const y = yFor(pct, g);
+    ctx.beginPath(); ctx.moveTo(g.x0, y); ctx.lineTo(g.x0 + g.pw, y); ctx.stroke();
+    ctx.fillText(pct + "%", g.x0 - 8, y);
+  }
+
+  if (state.bars.length === 0) {
+    ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText("Not enough history in this range yet", g.x0 + g.pw / 2, g.y0 + g.ph / 2);
+    return;
+  }
+
+  const { n, slot, barWidth } = barGeom(g);
+
+  ctx.fillStyle = COLOR;
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (let i = 0; i < n; i++) {
+    const bar = state.bars[i];
+    const cx = g.x0 + slot * i + slot / 2;
+    const y = yFor(bar.added, g);
+    ctx.fillRect(cx - barWidth / 2, y, barWidth, g.y0 + g.ph - y);
+
+    // Label every bar if there's room, otherwise thin them out so labels
+    // don't overlap into mush.
+    const labelEvery = Math.max(1, Math.ceil((n * 55) / g.pw));
+    if (i % labelEvery === 0) {
+      ctx.fillStyle = muted;
+      ctx.fillText(fmtBucket(bar.t), cx, g.y0 + g.ph + 8);
+      ctx.fillStyle = COLOR;
+    }
+  }
+}
+
+// ---- hover tooltip ---------------------------------------------------------
+canvas.addEventListener("mousemove", (e) => {
+  if (state.bars.length === 0) { tooltip.style.opacity = 0; return; }
+  const rect = canvas.getBoundingClientRect();
+  const { w, h } = { w: rect.width, h: rect.height };
+  const g = plotGeom(w, h);
+  const px = e.clientX - rect.left;
+  if (px < g.x0 || px > g.x0 + g.pw) { tooltip.style.opacity = 0; return; }
+
+  const { slot } = barGeom(g);
+  const idx = Math.min(state.bars.length - 1, Math.max(0, Math.floor((px - g.x0) / slot)));
+  const bar = state.bars[idx];
+  const cx = g.x0 + slot * idx + slot / 2;
+
+  tooltip.innerHTML = `<div class="t-time">${fmtTime(bar.t)}</div>` +
+    `<div class="t-row"><span class="t-dot" style="background:${COLOR}"></span>Added: <b>${bar.added.toFixed(1)}%</b></div>`;
+  tooltip.style.opacity = 1;
+  const tw = tooltip.offsetWidth;
+  let left = cx + 14;
+  if (left + tw > w) left = cx - tw - 14;
+  tooltip.style.left = left + "px";
+  tooltip.style.top = g.y0 + "px";
+});
+canvas.addEventListener("mouseleave", () => { tooltip.style.opacity = 0; });
+
+// ---- 30-day calendar view --------------------------------------------------
+const THIRTY_DAYS_MS = 2592000000;
+const DOW_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+document.getElementById("cal-dow").innerHTML = DOW_NAMES.map(n => `<div>${n}</div>`).join("");
+
+function renderCalendar() {
+  const since = now - THIRTY_DAYS_MS;
+  const bars = bucketize(data.filter(d => d.t >= since), DAY_MS);
+  const byDay = new Map(bars.map(b => [Math.floor(b.t / DAY_MS), b.added]));
+
+  const maxVal = Math.max(1, ...bars.map(b => b.added));
+  const startDay = Math.floor(since / DAY_MS);
+  const endDay = Math.floor(now / DAY_MS);
+
+  // Pad leading empty cells so the first real day lands under its correct
+  // weekday column (Sun..Sat), like a normal calendar grid.
+  const leadPad = new Date(startDay * DAY_MS).getDay();
+
+  const cells = [];
+  for (let i = 0; i < leadPad; i++) cells.push(null);
+  for (let day = startDay; day <= endDay; day++) cells.push(day);
+
+  const grid = document.getElementById("cal-grid");
+  grid.innerHTML = "";
+  for (const day of cells) {
+    const cell = document.createElement("div");
+    if (day === null) {
+      cell.className = "cal-cell empty";
+      grid.appendChild(cell);
+      continue;
+    }
+    const val = byDay.get(day);
+    const d = new Date(day * DAY_MS);
+    cell.className = "cal-cell";
+    if (val !== undefined) {
+      const alpha = 0.12 + 0.7 * (val / maxVal);
+      cell.style.background = `rgba(86, 180, 233, ${alpha.toFixed(2)})`;
+      cell.title = `${d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${val.toFixed(1)}% added`;
+    } else {
+      cell.title = d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+    }
+    cell.innerHTML = `<span class="cal-day">${d.getDate()}</span>` +
+      (val !== undefined ? `<span class="cal-val">${val.toFixed(0)}%</span>` : "");
+    grid.appendChild(cell);
+  }
+}
+
+// ---- controls -------------------------------------------------------------
+document.getElementById("ranges").addEventListener("click", (e) => {
+  const btn = e.target.closest("button"); if (!btn) return;
+  document.querySelectorAll("#ranges button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  state.rangeMs = Number(btn.dataset.ms);
+
+  const isCalendar = state.rangeMs === THIRTY_DAYS_MS;
+  document.getElementById("bar-view").style.display = isCalendar ? "none" : "";
+  document.getElementById("cal-view").classList.toggle("active", isCalendar);
+
+  if (isCalendar) renderCalendar();
+  else recompute();
+});
+window.addEventListener("resize", draw);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+
+// ---- boot -----------------------------------------------------------------
+document.getElementById("meta").textContent =
+  data.length ? `${data.length} samples · generated ${fmtTime(now)}` : "no history yet";
+document.getElementById("footer").textContent =
+  "7-Day utilization added per day — how much the rolling total actually climbed, not its absolute level. Okabe-Ito colorblind-safe blue (#56B4E9). Static snapshot; regenerate from the extension's Settings to refresh.";
+recompute();
+renderWeekdayPattern();
+</script>
+</body>
+</html>

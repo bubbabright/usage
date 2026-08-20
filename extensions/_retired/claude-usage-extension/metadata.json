@@ -1,0 +1,10 @@
+{
+  "name": "Claude Code Usage",
+  "description": "Display Claude Code usage in the top panel. This extension uses anthropic.com services. This extension is not affiliated, funded, or in any way associated with Claude.",
+  "uuid": "claude-code-usage@bubbabright",
+  "shell-version": ["46", "47", "48", "49"],
+  "url": "https://github.com/bubbabright/claude-usage-extension",
+  "settings-schema": "org.gnome.shell.extensions.claude-code-usage",
+  "version": 4,
+  "session-modes": ["user"]
+}

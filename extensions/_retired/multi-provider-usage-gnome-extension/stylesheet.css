@@ -1,0 +1,150 @@
+/* Multi-Provider Usage — panel styling.
+ *
+ * Goals: sit cleanly next to other panel indicators. Inherit the panel font
+ * (no hardcoded font-size), stay vertically centered, keep bars modest and
+ * theme-aware. Identity colors (per-window, Okabe-Ito from the daemon) are
+ * applied inline to the fill only — everything else is a CSS class. */
+
+/* .mp-panel's cell spacing (icon/tag/bars, and every bar's own label-track
+ * gap) is set in JS via Clutter.GridLayout's set_column_spacing/
+ * set_row_spacing — St's CSS `spacing` property only exists for BoxLayout
+ * and has no effect on a grid-managed widget, so it's not set here at all. */
+
+.mp-provider-tag {
+    font-size: 0.85em;
+    opacity: 0.85;
+    /* FIXED width, not a min/max range: this column's actual size is what
+     * determines this whole indicator's total width, and GNOME's status
+     * area packs indicators from the right edge of the screen — a narrower
+     * widget (short label, e.g. "Grok") sits with its left edge further
+     * right than a wider one ("OpenCode Go"), so the indicator visibly
+     * shifts per rotation. A single fixed width (not min/max) makes total
+     * widget width — and therefore its screen position — invariant to which
+     * provider is active. JS ellipsize (Pango, not CSS) truncates overflow
+     * on long labels; short labels just leave trailing space, same as any
+     * other fixed-width column here (bar-letter, bar-percent).
+     * Also still floors the column so GridLayout can't collapse it to ~0
+     * width in stacked mode, where this is the only actor in its column and
+     * spans 2 rows with no span=1 sibling there. */
+    width: 90px;
+}
+
+.mp-provider-subtitle {
+    font-size: 0.75em;
+    opacity: 0.6;
+    /* Same fixed-width reasoning as .mp-provider-tag just above — a range
+     * lets this column's size (and so total widget width) vary per active
+     * provider. Only ever attached when non-empty (see _renderPanelActive),
+     * so no width is wasted on an unused column when it's detached. */
+    width: 60px;
+}
+
+.mp-bar-letter {
+    font-size: 0.8em;
+    width: 22px;
+    text-align: end;
+    text-transform: uppercase;
+}
+
+.mp-bar-track {
+    height: 11px;
+    border-radius: 6px;
+    background-color: rgba(127, 127, 127, 0.25);
+    border: 1px solid rgba(127, 127, 127, 0.30);
+    overflow: hidden;
+}
+
+.mp-bar-fill {
+    height: 11px;
+    border-radius: 6px;
+}
+
+.mp-bar-percent {
+    font-size: 0.8em;
+    /* Monospace + fixed char count (fmtPct pads to 5 chars, extension.js),
+     * NOT a hardcoded pixel width. A pixel guess is tied to one font's
+     * metrics and breaks on anything wider (e.g. OpenDyslexic) — monospace
+     * glyphs are uniform width by definition, so a fixed character count
+     * renders at the same width regardless of which monospace font actually
+     * resolves on the user's system. No CSS width needed at all: natural
+     * size is already invariant. */
+    font-family: monospace;
+    text-align: start;
+}
+
+/* alarm = flashing LOGO, not a bar pulse (any provider/window projected to
+ * deplete flips this on the shared icon; rotation keeps cycling regardless) */
+.system-status-icon.mp-icon-alarm {
+    animation: mp-icon-pulse 1s ease-in-out infinite;
+}
+
+@keyframes mp-icon-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+/* dim the whole panel group when the active provider's data is stale */
+.mp-stale {
+    opacity: 0.55;
+}
+
+/* ---- menu ---- */
+.mp-menu-header {
+    font-weight: bold;
+}
+
+.mp-menu-provider-header {
+    font-weight: bold;
+    opacity: 0.9;
+    margin-top: 4px;
+}
+
+.mp-menu-status {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.mp-menu-window-name {
+    margin-left: 12px;
+    /* Floor so every provider's pct/reset columns start at the same x
+     * regardless of label length ("5h"/"Wk" vs "Session"/"Weekly") — same
+     * reasoning as .mp-provider-tag's min-width, real column not padded
+     * spaces (spaces in a proportional font don't align; a floor width
+     * does, and holds even if a future provider's label is longer still —
+     * it just grows the column, doesn't break the alignment that exists). */
+    min-width: 70px;
+}
+
+.mp-menu-window-pct {
+    /* Reuses .mp-bar-percent's exact reasoning (monospace + fmtPct's fixed
+     * 5-char pad) so "2%" and "83.1%" right-align on the same column here
+     * too, not just in the panel bars. */
+    font-family: monospace;
+    font-size: 0.85em;
+    text-align: end;
+}
+
+.mp-menu-window-reset {
+    font-size: 0.85em;
+    opacity: 0.7;
+    margin-left: 10px;
+}
+
+/* Rank-order reset timeline (see _rebuildTimeline, extension.js) — cells are
+ * x_expand St.BoxLayout children (St has no `homogeneous` prop), so leftover
+ * track width splits evenly across however many windows exist this render. */
+.mp-menu-timeline {
+    margin: 6px 12px;
+}
+
+.mp-menu-timeline-tick {
+    width: 18px;
+    height: 6px;
+    border-radius: 3px;
+}
+
+.mp-menu-timeline-label {
+    font-size: 0.68em;
+    opacity: 0.65;
+    margin-top: 2px;
+}

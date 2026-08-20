@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<!--
+  Claude usage-history report — self-contained artifact.
+
+  This file is a TEMPLATE. The extension (prefs.js) reads it, replaces the
+  two placeholder tokens below with live data, writes the result to
+  ~/.cache/claude-code-usage/usage-report.html, and opens it in the browser.
+
+  Placeholders (replaced verbatim, keep the exact strings):
+    /*__USAGE_DATA__*/[]     -> JSON array of {t, five_hour, seven_day}
+    /*__GENERATED_AT__*/0    -> Date.now() at generation time
+
+  Design goals:
+    - No external dependencies. No CDN, no fetch, no CORS. Opens offline
+      from file:// with data baked in.
+    - Canvas 2D, devicePixelRatio-aware so it stays crisp on HiDPI.
+    - Same Okabe-Ito colorblind-safe palette as the panel bars.
+    - five_hour and seven_day are fixed-length windows that ramp 0->100%
+      and cliff back to ~0% at each window's resets_at (5h window resets
+      ~5x/day, 7d window resets ~weekly) — the same numbers the panel bars
+      show. Plotted as-is: a dual line chart, same shape as the Grok usage
+      report, rather than re-derived into daily deltas.
+    - When the daemon lands (see HANDOFF.md, Phase 1), swap the inlined
+      USAGE_DATA for `await fetch('/usage/history')` — nothing else changes.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Usage History</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #6b6b6b;
+    --grid: rgba(0,0,0,0.10); --card: #f4f4f5; --border: rgba(0,0,0,0.12);
+    --five: #E69F00; --seven: #56B4E9; --crosshair: rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --fg: #ececec; --muted: #9a9a9a;
+      --grid: rgba(255,255,255,0.10); --card: #262626; --border: rgba(255,255,255,0.12);
+      --crosshair: rgba(255,255,255,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; gap: 6px; margin: 16px 0; flex-wrap: wrap; }
+  .controls button {
+    font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--fg);
+    cursor: pointer; transition: background 120ms, border-color 120ms;
+  }
+  .controls button:hover { border-color: var(--muted); }
+  .controls button.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .legend { display: flex; gap: 18px; margin: 10px 0 14px; font-size: 13px; }
+  .legend .item { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .legend .item.off { opacity: 0.35; text-decoration: line-through; }
+  .chart-wrap { position: relative; width: 100%; }
+  canvas { width: 100%; height: 340px; display: block; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 5; opacity: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.5; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18); transition: opacity 80ms;
+  }
+  .tooltip .t-time { color: var(--muted); margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
+  .tooltip .t-dot { width: 9px; height: 9px; border-radius: 2px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
+  footer { margin-top: 22px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Claude Usage History</h1>
+    <span class="sub" id="meta"></span>
+  </header>
+
+  <div class="controls" id="ranges">
+    <button data-ms="86400000">24 Hours</button>
+    <button data-ms="604800000" class="active">7 Days</button>
+    <button data-ms="2592000000">30 Days</button>
+    <button data-ms="0">All Time</button>
+  </div>
+
+  <div class="legend" id="legend">
+    <div class="item" data-series="five_hour"><span class="swatch" style="background:var(--five)"></span>5-Hour</div>
+    <div class="item" data-series="seven_day"><span class="swatch" style="background:var(--seven)"></span>7-Day</div>
+  </div>
+
+  <div class="chart-wrap" id="chart-view">
+    <canvas id="chart"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <footer id="footer"></footer>
+
+<script>
+"use strict";
+
+// ---- injected by the generator (see comment block at top of file) --------
+const USAGE_DATA = /*__USAGE_DATA__*/[];
+const GENERATED_AT = /*__GENERATED_AT__*/0;
+// --------------------------------------------------------------------------
+
+const SERIES = [
+  { key: "five_hour", label: "5-Hour", color: "#E69F00" },
+  { key: "seven_day", label: "7-Day", color: "#56B4E9" },
+];
+const PAD = { top: 16, right: 16, bottom: 28, left: 40 };
+
+const state = {
+  rangeMs: 604800000, // default: 7 days
+  points: {},          // key -> filtered {t, pct}, time-sorted
+  seriesOn: { five_hour: true, seven_day: true },
+};
+
+const canvas = document.getElementById("chart");
+const ctx = canvas.getContext("2d");
+const tooltip = document.getElementById("tooltip");
+
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+
+const allData = (USAGE_DATA || [])
+  .filter(d => d && typeof d.t === "number")
+  .sort((a, b) => a.t - b.t);
+
+const allBySeries = {};
+for (const s of SERIES) {
+  allBySeries[s.key] = allData
+    .filter(d => typeof d[s.key] === "number")
+    .map(d => ({ t: d.t, pct: clamp(d[s.key]) }));
+}
+
+const now = GENERATED_AT || Date.now();
+
+function fmtTime(ms) {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function recompute() {
+  const since = state.rangeMs ? now - state.rangeMs : 0;
+  for (const s of SERIES)
+    state.points[s.key] = allBySeries[s.key].filter(p => p.t >= since);
+  draw();
+}
+
+function setupCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: rect.width, h: rect.height };
+}
+
+function plotGeom(w, h) {
+  return {
+    x0: PAD.left, y0: PAD.top,
+    pw: w - PAD.left - PAD.right,
+    ph: h - PAD.top - PAD.bottom,
+  };
+}
+
+function xRange() {
+  const since = state.rangeMs ? now - state.rangeMs : Math.min(
+    ...SERIES.map(s => state.points[s.key].length ? state.points[s.key][0].t : now)
+  );
+  return { since, until: now };
+}
+
+function xFor(t, g, range) {
+  const span = Math.max(1, range.until - range.since);
+  return g.x0 + ((t - range.since) / span) * g.pw;
+}
+function yFor(v, g) { return g.y0 + g.ph - (clamp(v) / 100) * g.ph; }
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function drawSeriesLine(points, color, g, range) {
+  if (points.length === 0) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = xFor(p.t, g, range);
+    const y = yFor(p.pct, g);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  for (const p of points) {
+    const x = xFor(p.t, g, range);
+    const y = yFor(p.pct, g);
+    ctx.beginPath();
+    ctx.arc(x, y, points.length > 1 ? 2.5 : 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function draw() {
+  const { w, h } = setupCanvas();
+  const g = plotGeom(w, h);
+  ctx.clearRect(0, 0, w, h);
+
+  const grid = cssVar("--grid");
+  const muted = cssVar("--muted");
+  const range = xRange();
+
+  ctx.strokeStyle = grid; ctx.fillStyle = muted;
+  ctx.lineWidth = 1; ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let pct = 0; pct <= 100; pct += 25) {
+    const y = yFor(pct, g);
+    ctx.beginPath(); ctx.moveTo(g.x0, y); ctx.lineTo(g.x0 + g.pw, y); ctx.stroke();
+    ctx.fillText(pct + "%", g.x0 - 8, y);
+  }
+
+  const anyPoints = SERIES.some(s => state.points[s.key].length > 0);
+  if (!anyPoints) {
+    ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText("Not enough history in this range yet", g.x0 + g.pw / 2, g.y0 + g.ph / 2);
+    return;
+  }
+
+  for (const s of SERIES)
+    if (state.seriesOn[s.key]) drawSeriesLine(state.points[s.key], s.color, g, range);
+
+  ctx.fillStyle = muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+  ctx.fillText(fmtTime(range.since), g.x0, g.y0 + g.ph + 8);
+  ctx.textAlign = "right";
+  ctx.fillText(fmtTime(range.until), g.x0 + g.pw, g.y0 + g.ph + 8);
+}
+
+// ---- hover tooltip ---------------------------------------------------------
+function nearestPoint(points, targetT) {
+  let best = null, bestDist = Infinity;
+  for (const p of points) {
+    const dist = Math.abs(p.t - targetT);
+    if (dist < bestDist) { bestDist = dist; best = p; }
+  }
+  return best;
+}
+
+canvas.addEventListener("mousemove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const { w, h } = { w: rect.width, h: rect.height };
+  const g = plotGeom(w, h);
+  const px = e.clientX - rect.left;
+  if (px < g.x0 || px > g.x0 + g.pw) { tooltip.style.opacity = 0; return; }
+
+  const range = xRange();
+  const span = Math.max(1, range.until - range.since);
+  const targetT = range.since + ((px - g.x0) / g.pw) * span;
+
+  const rows = [];
+  for (const s of SERIES) {
+    if (!state.seriesOn[s.key]) continue;
+    const p = nearestPoint(state.points[s.key], targetT);
+    if (p) rows.push({ color: s.color, label: s.label, val: p.pct, t: p.t });
+  }
+  if (!rows.length) { tooltip.style.opacity = 0; return; }
+
+  tooltip.innerHTML = `<div class="t-time">${fmtTime(rows[0].t)}</div>` +
+    rows.map(r => `<div class="t-row"><span class="t-dot" style="background:${r.color}"></span>${r.label}: <b>${r.val.toFixed(1)}%</b></div>`).join("");
+  tooltip.style.opacity = 1;
+  const tw = tooltip.offsetWidth;
+  let left = px + 14;
+  if (left + tw > w) left = px - tw - 14;
+  tooltip.style.left = left + "px";
+  tooltip.style.top = g.y0 + "px";
+});
+canvas.addEventListener("mouseleave", () => { tooltip.style.opacity = 0; });
+
+// ---- legend toggle ---------------------------------------------------------
+document.getElementById("legend").addEventListener("click", (e) => {
+  const item = e.target.closest(".item"); if (!item) return;
+  const series = item.dataset.series;
+  state.seriesOn[series] = !state.seriesOn[series];
+  item.classList.toggle("off", !state.seriesOn[series]);
+  draw();
+});
+
+// ---- controls -------------------------------------------------------------
+document.getElementById("ranges").addEventListener("click", (e) => {
+  const btn = e.target.closest("button"); if (!btn) return;
+  document.querySelectorAll("#ranges button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  state.rangeMs = Number(btn.dataset.ms);
+  recompute();
+});
+window.addEventListener("resize", draw);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+
+// ---- boot -----------------------------------------------------------------
+document.getElementById("meta").textContent =
+  allData.length ? `${allData.length} samples · generated ${fmtTime(now)}` : "no history yet";
+document.getElementById("footer").textContent =
+  "5-Hour and 7-Day rolling-window utilization, plotted as recorded. Okabe-Ito colorblind-safe palette. " +
+  "Static snapshot; regenerate from the extension's Settings to refresh.";
+recompute();
+</script>
+</body>
+</html>

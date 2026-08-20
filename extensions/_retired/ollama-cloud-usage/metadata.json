@@ -1,0 +1,10 @@
+{
+  "uuid": "ollama-cloud-usage@bubbabright",
+  "name": "Ollama Cloud Usage",
+  "description": "Show Ollama Cloud usage (Session + Weekly) in the top panel. Thin client of usage-daemon (github.com/bubbabright/usage-daemon) — reads http://127.0.0.1:8787; it never touches the ollama.com cookie itself. Not affiliated with Ollama.",
+  "shell-version": ["46", "47", "48", "49"],
+  "url": "https://github.com/bubbabright/ollama-cloud-usage-extension",
+  "settings-schema": "org.gnome.shell.extensions.ollama-cloud-usage",
+  "session-modes": ["user"],
+  "version": 1
+}

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="claude-code-usage">
+  <schema id="org.gnome.shell.extensions.claude-code-usage" path="/org/gnome/shell/extensions/claude-code-usage/">
+    <key name="refresh-interval" type="i">
+      <default>300</default>
+      <summary>Refresh interval</summary>
+      <description>How often to refresh usage data in seconds</description>
+    </key>
+    <key name="icon-style" type="s">
+      <default>'color'</default>
+      <summary>Icon style</summary>
+      <description>Icon style: 'color' for the original colored icon, 'monochrome' for a desaturated monochrome icon</description>
+    </key>
+    <key name="show-icon" type="b">
+      <default>true</default>
+      <summary>Show icon</summary>
+      <description>Whether to show the Claude icon in the top bar</description>
+    </key>
+    <key name="proxy-url" type="s">
+      <default>''</default>
+      <summary>Proxy URL</summary>
+      <description>HTTP proxy URL (e.g., http://localhost:11809). Leave empty to use no proxy.</description>
+    </key>
+    <key name="show-five-hour-panel-bar" type="b">
+      <default>true</default>
+      <summary>Show 5-hour bar in panel</summary>
+      <description>Whether to show the 5-hour progress bar in the top panel, independent of its percentage text</description>
+    </key>
+    <key name="show-five-hour-panel-text" type="b">
+      <default>true</default>
+      <summary>Show 5-hour percentage in panel</summary>
+      <description>Whether to show the 5-hour percentage text in the top panel, independent of its bar</description>
+    </key>
+    <key name="show-seven-day-panel-bar" type="b">
+      <default>true</default>
+      <summary>Show 7-day bar in panel</summary>
+      <description>Whether to show the 7-day progress bar in the top panel, independent of its percentage text</description>
+    </key>
+    <key name="show-seven-day-panel-text" type="b">
+      <default>true</default>
+      <summary>Show 7-day percentage in panel</summary>
+      <description>Whether to show the 7-day percentage text in the top panel, independent of its bar</description>
+    </key>
+    <key name="hidden-extra-limits" type="s">
+      <default>'[]'</default>
+      <summary>Hidden extra limit rows</summary>
+      <description>JSON array of limit identifiers (from the API's dynamic limits list, e.g. per-model weekly caps) the user has chosen to hide from the dropdown menu</description>
+    </key>
+    <key name="last-fetch-succeeded" type="b">
+      <default>false</default>
+      <summary>Last usage fetch succeeded</summary>
+      <description>Whether the most recent usage API call returned 200. Used by prefs to warn if a manual token refresh is unnecessary.</description>
+    </key>
+    <key name="warn-on-projected-depletion" type="b">
+      <default>false</default>
+      <summary>Warn on projected depletion (ALPHA)</summary>
+      <description>Project current burn rate (from usage history) forward; if a limit is on track to hit 100% before its reset time, blink the affected panel bar orange/red or blue/red. Alpha feature — default off.</description>
+    </key>
+    <key name="refresh-trigger" type="i">
+      <default>0</default>
+      <summary>Manual refresh trigger</summary>
+      <description>Incremented by prefs.js after the manual token-refresh subprocess completes. The running extension watches this key and immediately re-fetches usage instead of waiting for the next poll interval.</description>
+    </key>
+    <key name="flash-on-refresh" type="b">
+      <default>true</default>
+      <summary>Flash panel on refresh</summary>
+      <description>Briefly flash the panel indicator each time a live usage fetch succeeds, as visual feedback that a refresh just happened</description>
+    </key>
+    <key name="csv-export-dir" type="s">
+      <default>''</default>
+      <summary>Last CSV export directory</summary>
+      <description>Directory the user last saved a usage-history CSV export to, remembered across sessions so the save dialog reopens there</description>
+    </key>
+    <key name="stack-panel-bars" type="b">
+      <default>false</default>
+      <summary>Stack panel bars vertically</summary>
+      <description>Whether to stack the 5-hour and 7-day panel bars vertically instead of side by side</description>
+    </key>
+    <key name="show-bar-labels" type="b">
+      <default>true</default>
+      <summary>Show metric letter tag</summary>
+      <description>Show a single-letter metric tag (5 = 5-hour, W = 7-day) to the left of each panel bar so the two are distinguishable at a glance. This is the "Show Label" column toggle — one of the four global panel-column toggles (logo/label/bar/percent).</description>
+    </key>
+    <!-- Global panel-column toggles (logo/label/bar/percent). Each governs one
+         column of every metric row at once, mirroring the panel left-to-right:
+         logo = show-icon, label = show-bar-labels, bar = show-panel-bar,
+         percent = show-panel-percent. Per-metric visibility is the row-master
+         keys below (show-five-hour / show-seven-day). -->
+    <key name="show-panel-bar" type="b">
+      <default>true</default>
+      <summary>Show progress bar column</summary>
+      <description>Global column toggle: whether the progress bar is drawn on every visible metric row in the top panel. Independent of the percent text.</description>
+    </key>
+    <key name="show-panel-percent" type="b">
+      <default>true</default>
+      <summary>Show percent column</summary>
+      <description>Global column toggle: whether the percentage text is drawn on every visible metric row in the top panel. Independent of the bar.</description>
+    </key>
+    <!-- Per-metric row masters: turn an entire metric row (its logo-share is
+         shared; label+bar+percent) on or off in the panel. -->
+    <key name="show-five-hour" type="b">
+      <default>true</default>
+      <summary>Show 5-hour metric row</summary>
+      <description>Whether the 5-hour metric row appears in the top panel at all. When off, its label/bar/percent are all hidden regardless of the column toggles.</description>
+    </key>
+    <key name="show-seven-day" type="b">
+      <default>true</default>
+      <summary>Show 7-day metric row</summary>
+      <description>Whether the 7-day metric row appears in the top panel at all. When off, its label/bar/percent are all hidden regardless of the column toggles.</description>
+    </key>
+    <!-- One-time flag: set true after the deprecated per-metric bar/text keys
+         (show-*-panel-bar / show-*-panel-text) have been folded into the new
+         global column toggles + row masters, so an existing user's choices
+         aren't reset on upgrade. -->
+    <key name="panel-show-migrated" type="b">
+      <default>false</default>
+      <summary>Panel Show keys migrated</summary>
+      <description>Internal: true once the pre-refined per-metric panel visibility keys have been migrated into the global column toggles and per-metric row masters.</description>
+    </key>
+  </schema>
+</schemalist>

@@ -1,0 +1,195 @@
+/* Panel */
+.grok-usage-icon {
+    margin-right: 0.4em;
+}
+
+.grok-usage-label {
+    font-weight: 700;
+}
+
+.grok-panel-label-monthly {
+    color: #56B4E9;
+}
+
+.grok-panel-label-weekly {
+    font-size: 0.93em;
+    color: #E69F00;
+}
+
+/* Row layout is [tag][bar][percent] — spacing lives in em so it scales with
+   the label's own font-size (including the stacked-mode inline scaling).
+   Fixed width so 'M' and 'W' occupy equal space and the bars start at the same
+   x — otherwise the two rows misalign in stacked (vertical) mode. em-based so it
+   tracks the stacked-mode inline font scaling. */
+.grok-panel-tag {
+    margin-right: 0.27em;
+    width: 1.1em;
+    text-align: center;
+}
+
+.grok-panel-percent {
+    margin-left: 0.27em;
+}
+
+.is-dark .grok-panel-flash {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 0.27em;
+}
+
+.is-light .grok-panel-flash {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 0.27em;
+}
+
+.grok-panel-progress-bg {
+    border-radius: 0.2em;
+    height: 0.8em;
+    width: 3.75em;
+    margin-left: 0.27em;
+}
+
+.is-dark .grok-panel-progress-bg {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.is-light .grok-panel-progress-bg {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.grok-panel-progress-bar-monthly {
+    height: 0.8em;
+    border-radius: 0.2em;
+    background-color: #56B4E9;
+}
+
+.grok-panel-progress-bar-weekly {
+    height: 0.8em;
+    border-radius: 0.2em;
+    background-color: #E69F00;
+}
+
+.grok-panel-progress-bar-warning {
+    height: 0.8em;
+    border-radius: 0.2em;
+    background-color: #ef4444;
+}
+
+/* HANDOFF-6: monthly bar = depletion, uses -warning above.
+   Percent text keeps identity colors. */
+
+/* Stacked panel bars — label font-size/line-height, bar height, and row
+   margin-top scale with text-scaling-factor via inline styles set by
+   _applyPanelSizing() in extension.js, not fixed here. Width stays fixed —
+   only height/spacing scale, so the stacked cluster doesn't get wider. */
+.panel-bars-stacked .panel-bar-row {
+    padding: 0;
+}
+
+.panel-bars-stacked .grok-usage-label {
+    padding: 0;
+}
+
+.panel-bars-stacked .grok-panel-progress-bg {
+    width: 48px;
+}
+
+.grok-hover-tooltip {
+    font-size: 0.8em;
+    border-radius: 0.4em;
+    padding: 0.27em 0.53em;
+}
+
+.is-dark .grok-hover-tooltip {
+    color: #ececec;
+    background-color: rgba(20, 20, 20, 0.92);
+}
+
+.is-light .grok-hover-tooltip {
+    color: #1a1a1a;
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.grok-stale {
+    opacity: 0.45;
+}
+
+.grok-stale-banner {
+    font-size: 0.87em;
+    font-weight: 600;
+    color: #eab308;
+    padding: 0.13em 0.27em;
+}
+
+.grok-menu-header {
+    padding: 0.27em 0.4em;
+}
+
+.grok-menu-title {
+    font-weight: bold;
+}
+
+.grok-refresh-button {
+    border-radius: 0.4em;
+    padding: 0.27em;
+}
+
+.is-dark .grok-refresh-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.is-light .grok-refresh-button:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.grok-section-title {
+    font-size: 0.87em;
+    font-weight: 600;
+}
+
+.is-dark .grok-section-title {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.is-light .grok-section-title {
+    color: rgba(0, 0, 0, 0.65);
+}
+
+.grok-percent-label {
+    font-size: 0.93em;
+    font-weight: 600;
+}
+
+.grok-reset-label {
+    font-size: 0.8em;
+}
+
+.is-dark .grok-reset-label {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.is-light .grok-reset-label {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+.grok-menu-muted {
+    font-size: 0.87em;
+}
+
+.is-dark .grok-menu-muted {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.is-light .grok-menu-muted {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+.grok-menu-value {
+    font-size: 0.93em;
+    font-weight: 600;
+    padding: 0.13em 0;
+}
+
+.grok-usage-section {
+    padding: 0.4em 0.8em;
+}

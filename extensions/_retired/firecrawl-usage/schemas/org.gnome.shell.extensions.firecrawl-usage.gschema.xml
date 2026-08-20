@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="firecrawl-usage">
+  <schema id="org.gnome.shell.extensions.firecrawl-usage" path="/org/gnome/shell/extensions/firecrawl-usage/">
+    <key name="refresh-interval" type="i">
+      <default>300</default>
+      <summary>Refresh interval (seconds)</summary>
+      <description>How often to poll GET /v2/team/credit-usage</description>
+    </key>
+    <key name="show-icon" type="b">
+      <default>true</default>
+      <summary>Show panel icon</summary>
+      <description>Whether to show the Firecrawl icon in the top panel</description>
+    </key>
+    <key name="show-panel-bar" type="b">
+      <default>true</default>
+      <summary>Show progress bar in panel</summary>
+      <description>Whether to show the progress bar in the top panel</description>
+    </key>
+    <key name="show-panel-text" type="b">
+      <default>true</default>
+      <summary>Show credit count in panel</summary>
+      <description>Whether to show the remaining-credits label in the top panel</description>
+    </key>
+    <key name="proxy-url" type="s">
+      <default>''</default>
+      <summary>Proxy URL</summary>
+      <description>HTTP proxy URL (e.g., http://localhost:11809). Leave empty to use no proxy.</description>
+    </key>
+    <key name="warn-on-low-runway" type="b">
+      <default>false</default>
+      <summary>Warn when balance is projected to run out soon (ALPHA)</summary>
+      <description>Project current burn rate (from usage history) forward; if the credit balance is on track to hit zero within runway-warn-days, blink the panel bar red. Alpha feature — default off.</description>
+    </key>
+    <key name="runway-warn-days" type="i">
+      <default>7</default>
+      <summary>Runway warning threshold (days)</summary>
+      <description>Blink the warning when projected days-to-zero falls at or below this many days</description>
+    </key>
+    <key name="flash-on-refresh" type="b">
+      <default>true</default>
+      <summary>Flash panel on refresh</summary>
+      <description>Brief flash each time a live poll succeeds</description>
+    </key>
+    <key name="csv-export-dir" type="s">
+      <default>''</default>
+      <summary>Last CSV export directory</summary>
+      <description>Directory the user last saved a usage-history CSV export to, remembered across sessions so the save dialog reopens there</description>
+    </key>
+  </schema>
+</schemalist>

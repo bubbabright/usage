@@ -1,0 +1,100 @@
+port = 8787
+
+[providers.ollama]
+enabled = true
+interval_seconds = 300
+# persists whatever cookie you paste in Settings -> survives daemon restarts
+cookie_file = "~/.config/usage-daemon/ollama.cookie"
+# Enables the "Refresh from Firefox" button for this provider (on request only —
+# the daemon never reads the browser profile on a timer). When the session
+# expires: log in to the site in Firefox, then press the button.
+cookie_from_firefox = "ollama.com"
+
+[providers.claude]
+enabled = true
+interval_seconds = 300
+
+[providers.grok]
+enabled = true
+interval_seconds = 300
+
+[providers.mistral]
+enabled = true
+interval_seconds = 300
+cookie_file = "~/.config/usage-daemon/mistral.cookie"
+# One domain covers console./admin./chat. — the plugin calls two of those hosts
+# and the working pasted cookie was always a merge across all of them.
+cookie_from_firefox = "mistral.ai"
+
+[providers.opencode-go]
+enabled = true
+interval_seconds = 300
+cookie_file = "~/.config/usage-daemon/opencode-go.cookie"
+cookie_from_firefox = "opencode.ai"
+# discoverWorkspaceId() hits a bare /workspace route that 404s (not a real
+# route on opencode.ai) -- pin the id directly to skip discovery entirely.
+workspace_id = "wrk_01KX9539EQF6MYWDM1SMYBPS1E"
+
+[providers.cloudflare]
+enabled = true
+interval_seconds = 300
+account_id = "f35176e8f58cb23aafb0acf2c246e2fe"
+# ABSOLUTE path (not ~/, which config.js resolves against the daemon dir).
+# Holds a scoped Cloudflare API token (dash.cloudflare.com -> My Profile ->
+# API Tokens -> Create Token, permission "Account Analytics: Read"). Does NOT
+# expire, unlike the old wrangler OAuth token. Paste a new one via webui
+# Settings -> Cloudflare -> API key; the daemon writes it back here so it
+# survives restarts.
+api_token_file = "/home/daniel/.config/usage-daemon/cloudflare.token"
+
+[providers.openrouter]
+enabled = true
+interval_seconds = 300
+# Key from openrouter.ai/settings/keys — paste it in the web UI Settings gear;
+# the daemon writes it here so it survives restarts. Reports auth_expired until
+# then. Absolute path — no ~/ (config.js resolves it against cwd).
+api_key_file = "/home/daniel/.config/usage-daemon/openrouter.key"
+
+[providers.deepgram]
+enabled = true
+interval_seconds = 300
+# Key with usage:read scope (console.deepgram.com) — paste it in the web UI
+# Settings gear; the daemon writes it here so it survives restarts. Reports
+# auth_expired until then.
+api_key_file = "/home/daniel/.config/usage-daemon/deepgram.key"
+# Optional starting-credit so balance shows as a %: balance_cap = 200
+
+[providers.groq]
+enabled = true
+interval_seconds = 900
+# Groq has no public spend API -- this reads x-ratelimit-* headers off a real
+# (1-token) chat completion, so each poll costs a real RPD/TPM tick. Key from
+# console.groq.com/keys. Absolute path -- no ~/ (config.js resolves against cwd).
+api_key_file = "/home/daniel/.config/usage-daemon/groq.key"
+# Optional: override the probe model (default openai/gpt-oss-20b)
+# model = "openai/gpt-oss-20b"
+
+[providers.firecrawl]
+enabled = true
+interval_seconds = 300
+# Firecrawl monthly credits w/ rollover. Reads /v2/team/credit-usage; the bar
+# tracks the current 1000-credit slice (sawtooths per plan spent), resets_at
+# surfaces only on the last slice. Key from firecrawl.dev/app/api-keys.
+# Absolute path -- no ~/ (config.js resolves against cwd).
+api_key_file = "/home/daniel/.config/usage-daemon/firecrawl.key"
+
+[providers.serpapi]
+enabled = true
+interval_seconds = 300
+# SerpApi monthly plan meter from the free Account API
+# (GET serpapi.com/account.json) — searches_per_month cap vs this_month_usage,
+# resetting at plan_renewal_date. Account API calls never count toward the
+# monthly quota, so polling is free. Auth is the `api_key` query param, not a
+# Bearer header. Key pasted via the web UI Settings gear persists here.
+# Absolute path -- no ~/ (config.js resolves against cwd).
+api_key_file = "/home/daniel/.config/usage-daemon/serpapi.key"
+
+# HTTP control surface (restart/stop from the web UI). Enabled on this
+# LAN/Tailscale-trusted host. restart/stop run under systemd.
+[control]
+allow_control = true

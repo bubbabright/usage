@@ -1,0 +1,12 @@
+[Unit]
+Description=usage-daemon (localhost usage polling for GNOME usage extensions)
+
+[Service]
+Type=simple
+ExecStart=/home/daniel/.nvm/versions/node/v24.16.0/bin/node /home/daniel/.local/share/usage-daemon/src/index.js
+WorkingDirectory=/home/daniel/.local/share/usage-daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

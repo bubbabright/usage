@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.ollama-cloud-usage"
+          path="/org/gnome/shell/extensions/ollama-cloud-usage/">
+
+    <key name="daemon-url" type="s">
+      <default>'http://127.0.0.1:8787'</default>
+      <summary>usage-daemon base URL</summary>
+      <description>Base URL of the usage-daemon that owns polling. Localhost only unless you know what you're doing.</description>
+    </key>
+
+    <key name="poll-interval" type="i">
+      <default>60</default>
+      <range min="10" max="3600"/>
+      <summary>Client re-read interval (seconds)</summary>
+      <description>How often the extension re-reads the daemon snapshot. The daemon does the real (slower) polling; this is a cheap local read.</description>
+    </key>
+
+    <key name="show-icon" type="b">
+      <default>true</default>
+      <summary>Show the panel icon</summary>
+    </key>
+
+    <key name="show-tier" type="b">
+      <default>true</default>
+      <summary>Show the tier badge in the panel</summary>
+    </key>
+
+    <key name="show-session-bar" type="b">
+      <default>true</default>
+      <summary>Show the Session usage bar in the panel</summary>
+    </key>
+
+    <key name="show-weekly-bar" type="b">
+      <default>true</default>
+      <summary>Show the Weekly usage bar in the panel</summary>
+    </key>
+
+    <key name="stack-panel-bars" type="b">
+      <default>false</default>
+      <summary>Stack the two bars vertically instead of side by side</summary>
+    </key>
+
+    <key name="show-bar-labels" type="b">
+      <default>true</default>
+      <summary>Show the S / W letter before each bar</summary>
+    </key>
+
+    <key name="warn-on-projected-depletion" type="b">
+      <default>false</default>
+      <summary>Blink a bar when the daemon projects it to deplete before reset</summary>
+    </key>
+
+  </schema>
+</schemalist>

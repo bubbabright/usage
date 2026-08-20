@@ -1,0 +1,34 @@
+port = 8787
+
+[providers.ollama]
+enabled = true
+interval_seconds = 300
+# persists whatever cookie you paste in Settings -> survives daemon restarts
+cookie_file = "~/.config/usage-daemon/ollama.cookie"
+
+[providers.claude]
+enabled = true
+interval_seconds = 300
+
+[providers.grok]
+enabled = true
+interval_seconds = 300
+
+[providers.mistral]
+enabled = true
+interval_seconds = 300
+cookie_file = "~/.config/usage-daemon/mistral.cookie"
+# no cookie set yet -> reports auth_expired until you add one via Settings
+
+[providers.opencode-go]
+enabled = true
+interval_seconds = 300
+cookie_file = "~/.config/usage-daemon/opencode-go.cookie"
+# discoverWorkspaceId() hits a bare /workspace route that 404s (not a real
+# route on opencode.ai) -- pin the id directly to skip discovery entirely.
+workspace_id = "wrk_01KX9539EQF6MYWDM1SMYBPS1E"
+
+[providers.codexbar]
+enabled = true
+interval_seconds = 300
+providers = "claude,grok,mistral,ollama,opencodego"
